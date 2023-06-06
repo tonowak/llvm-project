@@ -315,7 +315,9 @@ void LinkerDriver::addFile(StringRef path, bool withLOption) {
 
 // Add a given library by searching it from input search paths.
 void LinkerDriver::addLibrary(StringRef name) {
-  if (std::optional<std::string> path = searchLibrary(name))
+  if (name.size() > 0 && name[0] == '/')
+    addFile(saver().save(name), /*withLOption=*/true);
+  else if (std::optional<std::string> path = searchLibrary(name))
     addFile(saver().save(*path), /*withLOption=*/true);
   else
     error("unable to find library -l" + name, ErrorTag::LibNotFound, {name});
