@@ -2254,8 +2254,13 @@ static std::vector<WrappedSymbol> addWrappedSymbols(opt::InputArgList &args) {
     if (!sym)
       continue;
 
-    Symbol *wrap =
-        addUnusedUndefined(saver().save("__wrap_" + name), sym->binding);
+    // If __wrap_ is lazy force load it - it sym->binding might be
+    // weak, in which case the wrapped symbol will not get loaded.
+    StringRef wrapName = saver().save("__wrap_" + name);
+    Symbol *existingWrap = symtab.find(wrapName);
+    if (existingWrap && existingWrap->isLazy())
+	    existingWrap->extract();
+    Symbol *wrap = addUnusedUndefined(wrapName, sym->binding);
 
     // If __real_ is referenced, pull in the symbol if it is lazy. Do this after
     // processing __wrap_ as that may have referenced __real_.
