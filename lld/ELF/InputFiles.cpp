@@ -1442,11 +1442,13 @@ template <class ELFT> void SharedFile::parse() {
     // is stored to sh_info. If a local symbol appears after some non-local
     // symbol, that's a violation of the spec.
     StringRef name = CHECK(sym.getName(stringTable), this);
+    /*
     if (sym.getBinding() == STB_LOCAL) {
       errorOrWarn(toString(this) + ": invalid local symbol '" + name +
                   "' in global part of symbol table");
       continue;
     }
+    */
 
     const uint16_t ver = versyms[i], idx = ver & ~VERSYM_HIDDEN;
     if (sym.isUndefined()) {
