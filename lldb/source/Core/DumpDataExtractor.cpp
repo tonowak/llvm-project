@@ -863,6 +863,20 @@ lldb::offset_t lldb_private::DumpDataExtractor(
                             item_byte_size / 16, LLDB_INVALID_ADDRESS, 0, 0);
       s->PutChar('}');
       break;
+
+    case eFormatOCamlValue: {
+      uint64_t value = DE.GetU64(&offset);
+      if ((value & 0x1) == 0) {
+        /* Pointer */
+        offset =
+          DumpDataExtractor(DE, s, start_offset, eFormatPointer, 8, 1,
+                            1, base_addr, 0, 0);
+      } else {
+        /* Tagged immediate */
+        s->Printf("%" PRId64, value >> 1);
+      }
+      break;
+    }
     }
   }
 
