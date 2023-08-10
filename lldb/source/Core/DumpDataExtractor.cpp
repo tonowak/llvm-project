@@ -513,10 +513,37 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
           break;
         }
 
-        case 254: // Double_array_tag
-          // Empty float arrays have tag zero, so no special case here.
-          s->Printf("<double_array|%llu elements>@", wosize);
+        case 254: { // Double_array_tag
+          // N.B. Empty float arrays have tag zero
+          uint64_t wosize_to_print = wosize <= 10 ? wosize : 10;
+          s->Printf("[|");
+          for (uint64_t field = 0; field < wosize_to_print; field++) {
+            union {
+              double f;
+              uint64_t i;
+            } u;
+            u.i = process->ReadUnsignedIntegerFromMemory(value, 8, 0, error);
+            if (error.Fail()) {
+              s->Printf("<could not read floatarray field %llu>", field);
+            } else {
+              // CR mshinwell: should probably use proper float printing code
+              // elsewhere in this file
+              s->Printf("%g", u.f);
+            }
+
+            if (field < wosize_to_print - 1)
+              s->Printf(", ");
+          }
+          if (wosize_to_print < wosize) {
+            s->Printf(", <%llu more elements in floatarray>",
+                      wosize - wosize_to_print);
+          }
+          s->Printf("|]");
+
+          if (!error.Fail())
+            print_default = false;
           break;
+        }
 
         case 255: { // Custom_tag
           lldb::addr_t struct_custom_operations =
