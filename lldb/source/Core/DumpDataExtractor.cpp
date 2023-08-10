@@ -449,7 +449,7 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
         }
 
         case 251: // Abstract_tag
-          s->Printf("<abstract|%llu words>@", wosize);
+          s->Printf("<abstract|%" PRIu64 " words>@", wosize);
           break;
 
         case 252: { // String_tag
@@ -524,7 +524,7 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
             } u;
             u.i = process->ReadUnsignedIntegerFromMemory(value, 8, 0, error);
             if (error.Fail()) {
-              s->Printf("<could not read floatarray field %llu>", field);
+              s->Printf("<could not read floatarray field %" PRIu64 ">", field);
             } else {
               // CR mshinwell: should probably use proper float printing code
               // elsewhere in this file
@@ -535,7 +535,7 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
               s->Printf(", ");
           }
           if (wosize_to_print < wosize) {
-            s->Printf(", <%llu more elements in floatarray>",
+            s->Printf(", <%" PRIu64 " more elements in floatarray>",
                       wosize - wosize_to_print);
           }
           s->Printf("|]");
@@ -608,7 +608,7 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
                       s->Printf("<bigarray (could not read data and "
                                 "num-dimensions)>@");
                     } else {
-                      s->Printf("<bigarray%llu|data=%p>", num_dims,
+                      s->Printf("<bigarray%" PRIu64 "|data=%p>", num_dims,
                                 (void *)bigarray_data_ptr);
                       print_default = false;
                     }
@@ -641,7 +641,7 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
               uint64_t field_value = process->ReadUnsignedIntegerFromMemory(
                   value + field * 8, 8, 0, error);
               if (error.Fail()) {
-                s->Printf("<could not read field %llu>", field);
+                s->Printf("<could not read field %" PRIu64 ">", field);
                 failed = true;
               } else {
                 offset_t offset = 0;
