@@ -792,12 +792,13 @@ SymbolFileDWARFDebugMap::GetDynamicArrayInfoForUID(
   return std::nullopt;
 }
 
-bool SymbolFileDWARFDebugMap::CompleteType(CompilerType &compiler_type) {
+bool SymbolFileDWARFDebugMap::CompleteType(CompilerType &compiler_type,
+                                           ExecutionContext *exe_ctx) {
   bool success = false;
   if (compiler_type) {
     ForEachSymbolFile([&](SymbolFileDWARF *oso_dwarf) -> bool {
       if (oso_dwarf->HasForwardDeclForClangType(compiler_type)) {
-        oso_dwarf->CompleteType(compiler_type);
+        oso_dwarf->CompleteType(compiler_type, exe_ctx);
         success = true;
         return true;
       }

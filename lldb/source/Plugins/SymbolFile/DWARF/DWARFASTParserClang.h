@@ -21,6 +21,7 @@
 #include "DWARFFormValue.h"
 #include "LogChannelDWARF.h"
 #include "lldb/Core/PluginInterface.h"
+#include "lldb/Target/ExecutionContext.h"
 
 #include "Plugins/ExpressionParser/Clang/ClangASTImporter.h"
 #include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
@@ -57,7 +58,8 @@ public:
 
   bool
   CompleteTypeFromDWARF(const DWARFDIE &die, lldb_private::Type *type,
-                        lldb_private::CompilerType &compiler_type) override;
+                        lldb_private::CompilerType &compiler_type,
+                        lldb_private::ExecutionContext *exe_ctx) override;
 
   lldb_private::CompilerDecl
   GetDeclForUIDFromDWARF(const DWARFDIE &die) override;
@@ -149,7 +151,8 @@ protected:
       std::vector<DWARFDIE> &member_function_dies,
       DelayedPropertyList &delayed_properties,
       const lldb::AccessType default_accessibility,
-      lldb_private::ClangASTImporter::LayoutInfo &layout_info);
+      lldb_private::ClangASTImporter::LayoutInfo &layout_info,
+      lldb_private::ExecutionContext *exe_ctx);
 
   size_t
   ParseChildParameters(clang::DeclContext *containing_decl_ctx,
@@ -246,10 +249,12 @@ private:
                     const lldb_private::CompilerType &class_clang_type,
                     lldb::AccessType default_accessibility,
                     lldb_private::ClangASTImporter::LayoutInfo &layout_info,
-                    FieldInfo &last_field_info);
+                    FieldInfo &last_field_info,
+                    lldb_private::ExecutionContext *exe_ctx);
 
   bool CompleteRecordType(const DWARFDIE &die, lldb_private::Type *type,
-                          lldb_private::CompilerType &clang_type);
+                          lldb_private::CompilerType &clang_type,
+                          lldb_private::ExecutionContext *exe_ctx);
   bool CompleteEnumType(const DWARFDIE &die, lldb_private::Type *type,
                         lldb_private::CompilerType &clang_type);
 

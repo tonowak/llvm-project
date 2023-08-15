@@ -236,7 +236,8 @@ SymbolFileSymtab::GetDynamicArrayInfoForUID(
   return std::nullopt;
 }
 
-bool SymbolFileSymtab::CompleteType(lldb_private::CompilerType &compiler_type) {
+bool SymbolFileSymtab::CompleteType(lldb_private::CompilerType &compiler_type,
+                                    lldb_private::ExecutionContext *exe_ctx) {
   return false;
 }
 

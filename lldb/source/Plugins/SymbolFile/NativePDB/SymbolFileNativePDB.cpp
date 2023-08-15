@@ -2104,7 +2104,8 @@ SymbolFileNativePDB::GetDynamicArrayInfoForUID(
   return std::nullopt;
 }
 
-bool SymbolFileNativePDB::CompleteType(CompilerType &compiler_type) {
+bool SymbolFileNativePDB::CompleteType(CompilerType &compiler_type,
+                                       ExecutionContext *exe_ctx) {
   std::lock_guard<std::recursive_mutex> guard(GetModuleMutex());
   auto ts = compiler_type.GetTypeSystem();
   auto clang_type_system = ts.dyn_cast_or_null<TypeSystemClang>();

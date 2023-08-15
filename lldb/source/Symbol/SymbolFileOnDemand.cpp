@@ -209,13 +209,14 @@ SymbolFileOnDemand::GetDynamicArrayInfoForUID(
   return m_sym_file_impl->GetDynamicArrayInfoForUID(type_uid, exe_ctx);
 }
 
-bool SymbolFileOnDemand::CompleteType(CompilerType &compiler_type) {
+bool SymbolFileOnDemand::CompleteType(CompilerType &compiler_type,
+                                      ExecutionContext *exe_ctx) {
   if (!m_debug_info_enabled) {
     LLDB_LOG(GetLog(), "[{0}] {1} is skipped", GetSymbolFileName(),
              __FUNCTION__);
     return false;
   }
-  return m_sym_file_impl->CompleteType(compiler_type);
+  return m_sym_file_impl->CompleteType(compiler_type, exe_ctx);
 }
 
 CompilerDecl SymbolFileOnDemand::GetDeclForUID(lldb::user_id_t type_uid) {

@@ -595,7 +595,8 @@ std::optional<SymbolFile::ArrayInfo> SymbolFilePDB::GetDynamicArrayInfoForUID(
   return std::nullopt;
 }
 
-bool SymbolFilePDB::CompleteType(lldb_private::CompilerType &compiler_type) {
+bool SymbolFilePDB::CompleteType(lldb_private::CompilerType &compiler_type,
+                                 lldb_private::ExecutionContext *exe_ctx) {
   std::lock_guard<std::recursive_mutex> guard(
       GetObjectFile()->GetModule()->GetMutex());
 

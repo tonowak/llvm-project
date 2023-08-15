@@ -120,7 +120,8 @@ public:
       lldb::user_id_t type_uid,
       const lldb_private::ExecutionContext *exe_ctx) override;
 
-  bool CompleteType(CompilerType &compiler_type) override;
+  bool CompleteType(CompilerType &compiler_type,
+                    ExecutionContext *exe_ctx = nullptr) override;
   uint32_t ResolveSymbolContext(const Address &so_addr,
                                 lldb::SymbolContextItem resolve_scope,
                                 SymbolContext &sc) override;

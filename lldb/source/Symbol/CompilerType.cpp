@@ -620,7 +620,8 @@ uint32_t CompilerType::GetNumFields() const {
 CompilerType CompilerType::GetFieldAtIndex(size_t idx, std::string &name,
                                            uint64_t *bit_offset_ptr,
                                            uint32_t *bitfield_bit_size_ptr,
-                                           bool *is_bitfield_ptr) const {
+                                           bool *is_bitfield_ptr,
+                                           ExecutionContext *exe_ctx) const {
   if (IsValid())
     if (auto type_system_sp = GetTypeSystem())
       return type_system_sp->GetFieldAtIndex(m_type, idx, name, bit_offset_ptr,

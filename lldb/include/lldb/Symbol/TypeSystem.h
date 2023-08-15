@@ -316,7 +316,7 @@ public:
                                        size_t idx, std::string &name,
                                        uint64_t *bit_offset_ptr,
                                        uint32_t *bitfield_bit_size_ptr,
-                                       bool *is_bitfield_ptr) = 0;
+                                       bool *is_bitfield_ptr, ExecutionContext *exe_ctx = nullptr) = 0;
 
   virtual uint32_t
   GetNumDirectBaseClasses(lldb::opaque_compiler_type_t type) = 0;

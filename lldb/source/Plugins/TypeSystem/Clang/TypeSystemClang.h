@@ -457,7 +457,7 @@ public:
   npdb::PdbAstBuilder *GetNativePDBParser() override;
 
   // TypeSystemClang callbacks for external source lookups.
-  void CompleteTagDecl(clang::TagDecl *);
+  void CompleteTagDecl(clang::TagDecl *, ExecutionContext *exe_ctx);
 
   void CompleteObjCInterfaceDecl(clang::ObjCInterfaceDecl *);
 
@@ -784,7 +784,7 @@ public:
   CompilerType GetFieldAtIndex(lldb::opaque_compiler_type_t type, size_t idx,
                                std::string &name, uint64_t *bit_offset_ptr,
                                uint32_t *bitfield_bit_size_ptr,
-                               bool *is_bitfield_ptr) override;
+                               bool *is_bitfield_ptr, ExecutionContext *exe_ctx = nullptr) override;
 
   uint32_t GetNumDirectBaseClasses(lldb::opaque_compiler_type_t type) override;
 

@@ -1573,7 +1573,8 @@ bool SymbolFileDWARF::HasForwardDeclForClangType(
   return ast_parser->GetClangASTImporter().CanImport(compiler_type);
 }
 
-bool SymbolFileDWARF::CompleteType(CompilerType &compiler_type) {
+bool SymbolFileDWARF::CompleteType(CompilerType &compiler_type,
+                                   ExecutionContext *exe_ctx) {
   std::lock_guard<std::recursive_mutex> guard(GetModuleMutex());
   auto clang_type_system =
       compiler_type.GetTypeSystem().dyn_cast_or_null<TypeSystemClang>();
@@ -1582,6 +1583,8 @@ bool SymbolFileDWARF::CompleteType(CompilerType &compiler_type) {
         static_cast<DWARFASTParserClang *>(clang_type_system->GetDWARFParser());
     if (ast_parser &&
         ast_parser->GetClangASTImporter().CanImport(compiler_type))
+      //return ast_parser->GetClangASTImporter().CompleteType(compiler_type,
+      //exe_ctx);
       return ast_parser->GetClangASTImporter().CompleteType(compiler_type);
   }
 
@@ -1613,7 +1616,8 @@ bool SymbolFileDWARF::CompleteType(CompilerType &compiler_type) {
           type->GetName().AsCString());
     assert(compiler_type);
     if (DWARFASTParser *dwarf_ast = GetDWARFParser(*dwarf_die.GetCU()))
-      return dwarf_ast->CompleteTypeFromDWARF(dwarf_die, type, compiler_type);
+      return dwarf_ast->CompleteTypeFromDWARF(dwarf_die, type, compiler_type,
+                                              exe_ctx);
   }
   return false;
 }

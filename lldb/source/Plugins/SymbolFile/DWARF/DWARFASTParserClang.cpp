@@ -31,6 +31,7 @@
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/TypeList.h"
 #include "lldb/Symbol/TypeMap.h"
+#include "lldb/Target/ExecutionContext.h"
 #include "lldb/Target/Language.h"
 #include "lldb/Utility/LLDBAssert.h"
 #include "lldb/Utility/Log.h"
@@ -2110,7 +2111,8 @@ bool DWARFASTParserClang::ParseTemplateParameterInfos(
 
 bool DWARFASTParserClang::CompleteRecordType(const DWARFDIE &die,
                                              lldb_private::Type *type,
-                                             CompilerType &clang_type) {
+                                             CompilerType &clang_type,
+                                             ExecutionContext *exe_ctx) {
   const dw_tag_t tag = die.Tag();
   SymbolFileDWARF *dwarf = die.GetDWARF();
 
@@ -2140,7 +2142,8 @@ bool DWARFASTParserClang::CompleteRecordType(const DWARFDIE &die,
 
     DelayedPropertyList delayed_properties;
     ParseChildMembers(die, clang_type, bases, member_function_dies,
-                      delayed_properties, default_accessibility, layout_info);
+                      delayed_properties, default_accessibility, layout_info,
+                      exe_ctx);
 
     // Now parse any methods if there were any...
     for (const DWARFDIE &die : member_function_dies)
@@ -2214,7 +2217,8 @@ bool DWARFASTParserClang::CompleteEnumType(const DWARFDIE &die,
 
 bool DWARFASTParserClang::CompleteTypeFromDWARF(const DWARFDIE &die,
                                                 lldb_private::Type *type,
-                                                CompilerType &clang_type) {
+                                                CompilerType &clang_type,
+                                                ExecutionContext *exe_ctx) {
   SymbolFileDWARF *dwarf = die.GetDWARF();
 
   std::lock_guard<std::recursive_mutex> guard(
@@ -2235,7 +2239,7 @@ bool DWARFASTParserClang::CompleteTypeFromDWARF(const DWARFDIE &die,
   case DW_TAG_structure_type:
   case DW_TAG_union_type:
   case DW_TAG_class_type:
-    return CompleteRecordType(die, type, clang_type);
+    return CompleteRecordType(die, type, clang_type, exe_ctx);
   case DW_TAG_enumeration_type:
     return CompleteEnumType(die, type, clang_type);
   default:
@@ -2454,7 +2458,7 @@ namespace {
 /// Parsed form of all attributes that are relevant for parsing type members.
 struct MemberAttributes {
   explicit MemberAttributes(const DWARFDIE &die, const DWARFDIE &parent_die,
-                            ModuleSP module_sp);
+                            ModuleSP module_sp, ExecutionContext *exe_ctx);
   const char *name = nullptr;
   /// Indicates how many bits into the word (according to the host endianness)
   /// the low-order bit of the field starts. Can be negative.
@@ -2486,7 +2490,8 @@ struct PropertyAttributes {
 
 MemberAttributes::MemberAttributes(const DWARFDIE &die,
                                    const DWARFDIE &parent_die,
-                                   ModuleSP module_sp) {
+                                   ModuleSP module_sp,
+                                   ExecutionContext *exe_ctx) {
   member_byte_offset = (parent_die.Tag() == DW_TAG_union_type) ? 0 : UINT32_MAX;
 
   DWARFAttributes attributes;
@@ -2526,7 +2531,7 @@ MemberAttributes::MemberAttributes(const DWARFDIE &die,
           uint32_t block_offset =
               form_value.BlockData() - debug_info_data.GetDataStart();
           if (DWARFExpression::Evaluate(
-                  nullptr, // ExecutionContext *
+                  exe_ctx,
                   nullptr, // RegisterContext *
                   module_sp,
                   DataExtractor(debug_info_data, block_offset, block_length),
@@ -2638,7 +2643,7 @@ void DWARFASTParserClang::ParseObjCProperty(
 
   ModuleSP module_sp = parent_die.GetDWARF()->GetObjectFile()->GetModule();
 
-  const MemberAttributes attrs(die, parent_die, module_sp);
+  const MemberAttributes attrs(die, parent_die, module_sp, nullptr);
   const PropertyAttributes propAttrs(die);
 
   if (!propAttrs.prop_name) {
@@ -2726,7 +2731,8 @@ void DWARFASTParserClang::ParseSingleMember(
     const lldb_private::CompilerType &class_clang_type,
     lldb::AccessType default_accessibility,
     lldb_private::ClangASTImporter::LayoutInfo &layout_info,
-    FieldInfo &last_field_info) {
+    FieldInfo &last_field_info,
+    ExecutionContext *exe_ctx) {
   Log *log = GetLog(DWARFLog::TypeCompletion | DWARFLog::Lookups);
   // This function can only parse DW_TAG_member.
   assert(die.Tag() == DW_TAG_member);
@@ -2740,7 +2746,7 @@ void DWARFASTParserClang::ParseSingleMember(
       parent_byte_size == UINT64_MAX ? UINT64_MAX : parent_byte_size * 8;
 
   // FIXME: Remove the workarounds below and make this const.
-  MemberAttributes attrs(die, parent_die, module_sp);
+  MemberAttributes attrs(die, parent_die, module_sp, exe_ctx);
 
   const bool class_is_objc_object_or_interface =
       TypeSystemClang::IsObjCObjectOrInterfaceType(class_clang_type);
@@ -2995,7 +3001,8 @@ bool DWARFASTParserClang::ParseChildMembers(
     std::vector<DWARFDIE> &member_function_dies,
     DelayedPropertyList &delayed_properties,
     const AccessType default_accessibility,
-    ClangASTImporter::LayoutInfo &layout_info) {
+    ClangASTImporter::LayoutInfo &layout_info,
+    ExecutionContext *exe_ctx) {
   if (!parent_die)
     return false;
 
@@ -3017,7 +3024,8 @@ bool DWARFASTParserClang::ParseChildMembers(
 
     case DW_TAG_member:
       ParseSingleMember(die, parent_die, class_clang_type,
-                        default_accessibility, layout_info, last_field_info);
+                        default_accessibility, layout_info, last_field_info,
+                        exe_ctx);
       break;
 
     case DW_TAG_subprogram:

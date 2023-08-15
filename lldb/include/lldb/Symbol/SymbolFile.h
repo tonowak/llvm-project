@@ -209,7 +209,8 @@ public:
   GetDynamicArrayInfoForUID(lldb::user_id_t type_uid,
                             const lldb_private::ExecutionContext *exe_ctx) = 0;
 
-  virtual bool CompleteType(CompilerType &compiler_type) = 0;
+  virtual bool CompleteType(CompilerType &compiler_type,
+                            lldb_private::ExecutionContext *exe_ctx = nullptr) = 0;
   virtual void ParseDeclsForContext(CompilerDeclContext decl_ctx) {}
   virtual CompilerDecl GetDeclForUID(lldb::user_id_t uid) {
     return CompilerDecl();

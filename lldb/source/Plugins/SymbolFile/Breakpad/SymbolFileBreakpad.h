@@ -99,7 +99,11 @@ public:
     return std::nullopt;
   }
 
-  bool CompleteType(CompilerType &compiler_type) override { return false; }
+  bool CompleteType(CompilerType &compiler_type,
+                    ExecutionContext *exe_ctx = nullptr) override {
+    return false;
+  }
+
   uint32_t ResolveSymbolContext(const Address &so_addr,
                                 lldb::SymbolContextItem resolve_scope,
                                 SymbolContext &sc) override;

@@ -143,7 +143,8 @@ public:
       lldb::user_id_t type_uid,
       const lldb_private::ExecutionContext *exe_ctx) override;
 
-  bool CompleteType(lldb_private::CompilerType &compiler_type) override;
+  bool CompleteType(lldb_private::CompilerType &compiler_type,
+                    lldb_private::ExecutionContext *exe_ctx = nullptr) override;
 
   lldb_private::Type *ResolveType(const DWARFDIE &die,
                                   bool assert_not_being_parsed = true,

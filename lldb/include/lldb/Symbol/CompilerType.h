@@ -356,7 +356,7 @@ public:
   CompilerType GetFieldAtIndex(size_t idx, std::string &name,
                                uint64_t *bit_offset_ptr,
                                uint32_t *bitfield_bit_size_ptr,
-                               bool *is_bitfield_ptr) const;
+                               bool *is_bitfield_ptr, ExecutionContext *exe_ctn = nullptr) const;
 
   uint32_t GetNumDirectBaseClasses() const;
 

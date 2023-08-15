@@ -2699,6 +2699,7 @@ TypeSystemClang::GetDeclContextForType(clang::QualType type) {
 
 static bool GetCompleteQualType(clang::ASTContext *ast,
                                 clang::QualType qual_type,
+                                ExecutionContext *exe_ctx,
                                 bool allow_completion = true) {
   qual_type = RemoveWrappingTypes(qual_type);
   const clang::Type::TypeClass type_class = qual_type->getTypeClass();
@@ -2711,7 +2712,7 @@ static bool GetCompleteQualType(clang::ASTContext *ast,
 
     if (array_type)
       return GetCompleteQualType(ast, array_type->getElementType(),
-                                 allow_completion);
+                                 exe_ctx, allow_completion);
   } break;
   case clang::Type::Record: {
     clang::CXXRecordDecl *cxx_record_decl = qual_type->getAsCXXRecordDecl();
@@ -2728,9 +2729,11 @@ static bool GetCompleteQualType(clang::ASTContext *ast,
 
         // Call the field_begin() accessor to for it to use the external source
         // to load the fields...
-        clang::ExternalASTSource *external_ast_source =
-            ast->getExternalSource();
+        // TODO: do it properly
+        ClangExternalASTSourceCallbacks *external_ast_source =
+          llvm::dyn_cast<ClangExternalASTSourceCallbacks>(ast->getExternalSource());
         if (external_ast_source) {
+          external_ast_source->SetExecutionContext(exe_ctx);
           external_ast_source->CompleteType(cxx_record_decl);
           if (cxx_record_decl->isCompleteDefinition()) {
             cxx_record_decl->field_begin();
@@ -2805,7 +2808,7 @@ static bool GetCompleteQualType(clang::ASTContext *ast,
   case clang::Type::Attributed:
     return GetCompleteQualType(
         ast, llvm::cast<clang::AttributedType>(qual_type)->getModifiedType(),
-        allow_completion);
+        exe_ctx, allow_completion);
 
   default:
     break;
@@ -3018,7 +3021,7 @@ bool TypeSystemClang::IsCompleteType(lldb::opaque_compiler_type_t type) {
   // care (or even know) about this behavior.
   const bool allow_completion = true;
   return GetCompleteQualType(&getASTContext(), GetQualType(type),
-                             allow_completion);
+                             nullptr, allow_completion);
 }
 
 bool TypeSystemClang::IsConst(lldb::opaque_compiler_type_t type) {
@@ -3808,7 +3811,7 @@ bool TypeSystemClang::GetCompleteType(lldb::opaque_compiler_type_t type) {
     return false;
   const bool allow_completion = true;
   return GetCompleteQualType(&getASTContext(), GetQualType(type),
-                             allow_completion);
+                             nullptr, allow_completion);
 }
 
 ConstString TypeSystemClang::GetTypeName(lldb::opaque_compiler_type_t type,
@@ -4402,7 +4405,7 @@ TypeSystemClang::GetNumMemberFunctions(lldb::opaque_compiler_type_t type) {
     clang::QualType qual_type = RemoveWrappingTypes(GetCanonicalQualType(type));
     switch (qual_type->getTypeClass()) {
     case clang::Type::Record:
-      if (GetCompleteQualType(&getASTContext(), qual_type)) {
+      if (GetCompleteQualType(&getASTContext(), qual_type, nullptr)) {
         const clang::RecordType *record_type =
             llvm::cast<clang::RecordType>(qual_type.getTypePtr());
         const clang::RecordDecl *record_decl = record_type->getDecl();
@@ -4466,7 +4469,7 @@ TypeSystemClang::GetMemberFunctionAtIndex(lldb::opaque_compiler_type_t type,
     clang::QualType qual_type = RemoveWrappingTypes(GetCanonicalQualType(type));
     switch (qual_type->getTypeClass()) {
     case clang::Type::Record:
-      if (GetCompleteQualType(&getASTContext(), qual_type)) {
+      if (GetCompleteQualType(&getASTContext(), qual_type, nullptr)) {
         const clang::RecordType *record_type =
             llvm::cast<clang::RecordType>(qual_type.getTypePtr());
         const clang::RecordDecl *record_decl = record_type->getDecl();
@@ -5402,7 +5405,7 @@ uint32_t TypeSystemClang::GetNumChildren(lldb::opaque_compiler_type_t type,
   case clang::Type::Complex:
     return 0;
   case clang::Type::Record:
-    if (GetCompleteQualType(&getASTContext(), qual_type)) {
+    if (GetCompleteQualType(&getASTContext(), qual_type, const_cast<ExecutionContext*>(exe_ctx))) {
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(qual_type.getTypePtr());
       const clang::RecordDecl *record_decl = record_type->getDecl();
@@ -5446,7 +5449,7 @@ uint32_t TypeSystemClang::GetNumChildren(lldb::opaque_compiler_type_t type,
 
   case clang::Type::ObjCObject:
   case clang::Type::ObjCInterface:
-    if (GetCompleteQualType(&getASTContext(), qual_type)) {
+    if (GetCompleteQualType(&getASTContext(), qual_type, nullptr)) {
       const clang::ObjCObjectType *objc_class_type =
           llvm::dyn_cast<clang::ObjCObjectType>(qual_type.getTypePtr());
       assert(objc_class_type);
@@ -5760,7 +5763,8 @@ CompilerType TypeSystemClang::GetFieldAtIndex(lldb::opaque_compiler_type_t type,
                                               size_t idx, std::string &name,
                                               uint64_t *bit_offset_ptr,
                                               uint32_t *bitfield_bit_size_ptr,
-                                              bool *is_bitfield_ptr) {
+                                              bool *is_bitfield_ptr,
+                                              ExecutionContext *exe_ctx) {
   if (!type)
     return CompilerType();
 
@@ -9428,12 +9432,13 @@ clang::ClassTemplateDecl *TypeSystemClang::ParseClassTemplateDecl(
   return nullptr;
 }
 
-void TypeSystemClang::CompleteTagDecl(clang::TagDecl *decl) {
+void TypeSystemClang::CompleteTagDecl(clang::TagDecl *decl,
+                                      ExecutionContext *exe_ctx) {
   SymbolFile *sym_file = GetSymbolFile();
   if (sym_file) {
     CompilerType clang_type = GetTypeForDecl(decl);
     if (clang_type)
-      sym_file->CompleteType(clang_type);
+      sym_file->CompleteType(clang_type, exe_ctx);
   }
 }
 

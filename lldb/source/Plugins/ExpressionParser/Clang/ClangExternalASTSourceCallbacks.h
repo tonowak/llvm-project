@@ -18,8 +18,12 @@ namespace lldb_private {
 class ClangExternalASTSourceCallbacks : public clang::ExternalASTSource {
   /// LLVM RTTI support.
   static char ID;
+  ExecutionContext *exe_ctx = nullptr;
 
 public:
+  void SetExecutionContext(ExecutionContext *_exe_ctx) {
+    exe_ctx = _exe_ctx;
+  }
   /// LLVM RTTI support.
   bool isA(const void *ClassID) const override { return ClassID == &ID; }
   static bool classof(const clang::ExternalASTSource *s) { return s->isA(&ID); }

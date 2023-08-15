@@ -12,6 +12,7 @@
 
 #include <optional>
 #include <vector>
+#include <iostream>
 
 #include "lldb/Core/Module.h"
 #include "lldb/Core/Value.h"
@@ -872,10 +873,15 @@ bool DWARFExpression::Evaluate(
   StackFrame *frame = nullptr;
   Target *target = nullptr;
 
+  std::cerr << "exe_ctx: " << exe_ctx << std::endl;
+
   if (exe_ctx) {
     process = exe_ctx->GetProcessPtr();
     frame = exe_ctx->GetFramePtr();
     target = exe_ctx->GetTargetPtr();
+  }
+  else {
+    exit(1);
   }
   if (reg_ctx == nullptr && frame)
     reg_ctx = frame->GetRegisterContext().get();
@@ -990,9 +996,11 @@ bool DWARFExpression::Evaluate(
           error_ptr->SetErrorString("Expression stack empty for DW_OP_deref.");
         return false;
       }
+      std::cerr << "DW_OP_deref\n";
       Value::ValueType value_type = stack.back().GetValueType();
       switch (value_type) {
       case Value::ValueType::HostAddress: {
+        std::cerr << "DW_OP_deref HostAddress\n";
         void *src = (void *)stack.back().GetScalar().ULongLong();
         intptr_t ptr;
         ::memcpy(&ptr, src, sizeof(void *));
@@ -1000,6 +1008,7 @@ bool DWARFExpression::Evaluate(
         stack.back().ClearContext();
       } break;
       case Value::ValueType::FileAddress: {
+        std::cerr << "DW_OP_deref FileAddress\n";
         auto file_addr = stack.back().GetScalar().ULongLong(
             LLDB_INVALID_ADDRESS);
 
@@ -1015,10 +1024,12 @@ bool DWARFExpression::Evaluate(
       }
         [[fallthrough]];
       case Value::ValueType::Scalar:
+        std::cerr << "DW_OP_deref Scalar\n";
         // Promote Scalar to LoadAddress and fall through.
         stack.back().SetValueType(Value::ValueType::LoadAddress);
         [[fallthrough]];
       case Value::ValueType::LoadAddress:
+        std::cerr << "DW_OP_deref LoadAddress\n";
         if (exe_ctx) {
           if (process) {
             lldb::addr_t pointer_addr =
@@ -1033,6 +1044,7 @@ bool DWARFExpression::Evaluate(
               stack.back().ClearContext();
             } else {
               if (error_ptr)
+                std::cerr << "FAILED HERE\n";
                 error_ptr->SetErrorStringWithFormat(
                     "Failed to dereference pointer from 0x%" PRIx64
                     " for DW_OP_deref: %s\n",
@@ -1040,11 +1052,13 @@ bool DWARFExpression::Evaluate(
               return false;
             }
           } else {
+            std::cerr << "FAILED here?\n";
             if (error_ptr)
               error_ptr->SetErrorString("NULL process for DW_OP_deref.\n");
             return false;
           }
         } else {
+          std::cerr << "FAILED context?\n";
           if (error_ptr)
             error_ptr->SetErrorString(
                 "NULL execution context for DW_OP_deref.\n");
@@ -1053,6 +1067,7 @@ bool DWARFExpression::Evaluate(
         break;
 
       case Value::ValueType::Invalid:
+        std::cerr << "DW_OP_deref Invalid\n";
         if (error_ptr)
           error_ptr->SetErrorString("Invalid value type for DW_OP_deref.\n");
         return false;

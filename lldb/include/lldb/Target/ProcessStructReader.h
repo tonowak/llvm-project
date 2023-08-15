@@ -49,12 +49,14 @@ public:
     m_addr_byte_size = process->GetAddressByteSize();
 
     for (size_t idx = 0; idx < struct_type.GetNumFields(); idx++) {
+      ExecutionContext exe_ctx;
+      process->CalculateExecutionContext(exe_ctx);
       std::string name;
       uint64_t bit_offset;
       uint32_t bitfield_bit_size;
       bool is_bitfield;
       CompilerType field_type = struct_type.GetFieldAtIndex(
-          idx, name, &bit_offset, &bitfield_bit_size, &is_bitfield);
+          idx, name, &bit_offset, &bitfield_bit_size, &is_bitfield, &exe_ctx);
       // no support for bitfields in here (yet)
       if (is_bitfield)
         return;
