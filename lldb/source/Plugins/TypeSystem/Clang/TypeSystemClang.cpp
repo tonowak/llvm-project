@@ -7403,7 +7403,7 @@ TypeSystemClang::GetAsObjCInterfaceDecl(const CompilerType &type) {
 clang::FieldDecl *TypeSystemClang::AddFieldToRecordType(
     const CompilerType &type, llvm::StringRef name,
     const CompilerType &field_clang_type, AccessType access,
-    uint32_t bitfield_bit_size) {
+    uint32_t bitfield_bit_size, uint64_t variant_discr_value) {
   if (!type.IsValid() || !field_clang_type.IsValid())
     return nullptr;
   auto ts = type.GetTypeSystem();
@@ -7434,6 +7434,7 @@ clang::FieldDecl *TypeSystemClang::AddFieldToRecordType(
     field->setType(ClangUtil::GetQualType(field_clang_type));
     if (bit_width)
       field->setBitWidth(bit_width);
+    field->setVariantDiscrValue(variant_discr_value);
     SetMemberOwningModule(field, record_decl);
 
     if (name.empty()) {
@@ -9119,10 +9120,27 @@ bool TypeSystemClang::DumpTypeValue(
           exe_scope);
     } break;
 
-    case clang::Type::Record:
+    case clang::Type::Record: {
+      // At this point, we know that the record represents a variant.
+      // We first retrieve the CXXRecordDecl in which are the member fields
+      // that contains the DW_AT_discr_value.
+      const clang::RecordType *record_type =
+          llvm::cast<clang::RecordType>(qual_type.getTypePtr());
+      assert(record_type);
+      const clang::RecordDecl *record_decl = record_type->getDecl();
+      assert(record_decl);
+      const clang::CXXRecordDecl *cxx_record_decl =
+          llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
+      assert(cxx_record_decl);
+      for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
+        // CR tnowak: TODO: remove this temporary printing.
+        s->PutULEB128(field_decl->getVariantDiscrValue());
+      }
+
       s->PutCString("IM A VARIANT!");
       // CR tnowak: currently format == eFormatBytes, is that a problem?
       return true;
+    } break;
 
     case clang::Type::Enum:
       // If our format is enum or default, show the enumeration value as its

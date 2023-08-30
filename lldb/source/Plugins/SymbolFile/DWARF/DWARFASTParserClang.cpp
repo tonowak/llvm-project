@@ -2726,7 +2726,7 @@ void DWARFASTParserClang::ParseSingleMember(
     const lldb_private::CompilerType &class_clang_type,
     lldb::AccessType default_accessibility,
     lldb_private::ClangASTImporter::LayoutInfo &layout_info,
-    FieldInfo &last_field_info) {
+    FieldInfo &last_field_info, uint64_t variant_discr_value) {
   Log *log = GetLog(DWARFLog::TypeCompletion | DWARFLog::Lookups);
   // This function can only parse DW_TAG_member.
   assert(die.Tag() == DW_TAG_member);
@@ -2981,7 +2981,7 @@ void DWARFASTParserClang::ParseSingleMember(
 
   clang::FieldDecl *field_decl = TypeSystemClang::AddFieldToRecordType(
       class_clang_type, attrs.name, member_clang_type, attrs.accessibility,
-      attrs.bit_size);
+      attrs.bit_size, variant_discr_value);
 
   m_ast.SetMetadataAsUserID(field_decl, die.GetID());
 
@@ -3033,13 +3033,12 @@ void DWARFASTParserClang::ParseVariantPart(
       }
       // For now, we don't support default variants, which don't have the DW_AT_discr_value.
       assert(uval64 != UINT64_MAX);
-      // CR tnowak: TODO: use the uval64
 
       // Adding each DW_TAG_member directly under the struct.
       for (DWARFDIE member_child_die : variant_die.children())
         if (member_child_die.Tag() == DW_TAG_member)
           ParseSingleMember(member_child_die, parent_die, class_clang_type,
-              default_accessibility, layout_info, last_field_info);
+              default_accessibility, layout_info, last_field_info, uval64);
     }
 
   // Setting a flag in CXXRecordDecl for custom printing of the variant.

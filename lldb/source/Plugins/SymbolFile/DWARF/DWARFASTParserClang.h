@@ -246,7 +246,7 @@ private:
                     const lldb_private::CompilerType &class_clang_type,
                     lldb::AccessType default_accessibility,
                     lldb_private::ClangASTImporter::LayoutInfo &layout_info,
-                    FieldInfo &last_field_info);
+                    FieldInfo &last_field_info, uint64_t variant_discr_value = UINT64_MAX);
 
   void
   ParseVariantPart(const DWARFDIE &die, const DWARFDIE &parent_die,
