@@ -248,6 +248,13 @@ private:
                     lldb_private::ClangASTImporter::LayoutInfo &layout_info,
                     FieldInfo &last_field_info);
 
+  void
+  ParseVariantPart(const DWARFDIE &die, const DWARFDIE &parent_die,
+                    const lldb_private::CompilerType &class_clang_type,
+                    lldb::AccessType default_accessibility,
+                    lldb_private::ClangASTImporter::LayoutInfo &layout_info,
+                    FieldInfo &last_field_info);
+
   bool CompleteRecordType(const DWARFDIE &die, lldb_private::Type *type,
                           lldb_private::CompilerType &clang_type);
   bool CompleteEnumType(const DWARFDIE &die, lldb_private::Type *type,

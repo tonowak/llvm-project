@@ -1437,7 +1437,7 @@ public:
   }
 
   /// Notify the class that this destructor is now selected.
-  /// 
+  ///
   /// Important properties of the class depend on destructor properties. Since
   /// C++20, it is possible to have multiple destructor declarations in a class
   /// out of which one will be selected at the end.
@@ -1835,6 +1835,18 @@ public:
     return K >= firstCXXRecord && K <= lastCXXRecord;
   }
   void markAbstract() { data().Abstract = true; }
+
+private:
+  bool m_is_variant = false;
+
+public:
+  bool isVariant() {
+    return m_is_variant;
+  }
+
+  void setVariant(bool is_variant) {
+    m_is_variant = is_variant;
+  }
 };
 
 /// Store information needed for an explicit specifier.

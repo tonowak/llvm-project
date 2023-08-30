@@ -9,6 +9,7 @@
 
 #include "TypeSystemClang.h"
 
+#include "clang/AST/DeclCXX.h"
 #include "llvm/Support/FormatAdapters.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -2849,7 +2850,7 @@ bool TypeSystemClang::IsAggregateType(lldb::opaque_compiler_type_t type) {
   case clang::Type::ConstantArray:
   case clang::Type::ExtVector:
   case clang::Type::Vector:
-  case clang::Type::Record:
+  // case clang::Type::Record: CR tnowak: verify this
   case clang::Type::ObjCObject:
   case clang::Type::ObjCInterface:
     return true;
@@ -4021,8 +4022,12 @@ TypeSystemClang::GetTypeInfo(lldb::opaque_compiler_type_t type,
     return eTypeHasChildren | eTypeIsPointer | eTypeHasValue;
 
   case clang::Type::Record:
-    if (qual_type->getAsCXXRecordDecl())
-      return eTypeHasChildren | eTypeIsClass | eTypeIsCPlusPlus;
+    if (clang::CXXRecordDecl *record_decl = qual_type->getAsCXXRecordDecl()) {
+      if(record_decl->isVariant())
+        return eTypeHasValue | eTypeIsClass | eTypeIsCPlusPlus | eTypeOptionHideChildren;
+      else
+        return eTypeHasChildren | eTypeIsClass | eTypeIsCPlusPlus;
+    }
     else
       return eTypeHasChildren | eTypeIsStructUnion;
     break;
@@ -5309,6 +5314,7 @@ lldb::Format TypeSystemClang::GetFormat(lldb::opaque_compiler_type_t type) {
   case clang::Type::ObjCInterface:
     break;
   case clang::Type::Record:
+  // CR tnowak: maybe return the format type here?
     break;
   case clang::Type::Enum:
     return lldb::eFormatEnum;
@@ -9112,6 +9118,11 @@ bool TypeSystemClang::DumpTypeValue(
                                // bitfield_bit_size != 0
           exe_scope);
     } break;
+
+    case clang::Type::Record:
+      s->PutCString("IM A VARIANT!");
+      // CR tnowak: currently format == eFormatBytes, is that a problem?
+      return true;
 
     case clang::Type::Enum:
       // If our format is enum or default, show the enumeration value as its
