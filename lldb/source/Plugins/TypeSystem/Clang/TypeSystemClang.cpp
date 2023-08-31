@@ -9133,6 +9133,7 @@ bool TypeSystemClang::DumpTypeValue(
       const clang::CXXRecordDecl *cxx_record_decl =
           llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
       assert(cxx_record_decl);
+      assert(cxx_record_decl->isVariant());
 
       // Finding the {pointer, idx of child} of the field which contains the discriminant.
       std::pair<clang::FieldDecl*, uint32_t> discr_field = {nullptr, 0};
@@ -9146,12 +9147,25 @@ bool TypeSystemClang::DumpTypeValue(
       }
       assert(discr_field.first);
 
-      // Getting the discriminant value. We're assuming that the discriminant
-      // is a bit field, but that isn't always true.
+      auto get_bit_size = [&](clang::FieldDecl *field, uint32_t field_idx) {
+        clang::QualType field_type = field->getType();
+        CompilerType field_clang_type = GetType(field_type);
+        unsigned int field_bit_size;
+        if (field->isBitField()) {
+          field_bit_size = field->getBitWidthValue(getASTContext());
+        }
+        else {
+          std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
+          assert(size && *size < UINT32_MAX);
+          field_bit_size = 8 * (unsigned int) *size;
+        }
+        return field_bit_size;
+      };
+
+      // Getting the discriminant value.
       const clang::ASTRecordLayout &record_layout =
           getASTContext().getASTRecordLayout(record_decl);
-      assert(discr_field.first->isBitField());
-      unsigned int discr_bit_size = discr_field.first->getBitWidthValue(getASTContext());
+      unsigned int discr_bit_size = get_bit_size(discr_field.first, discr_field.second);
       unsigned int discr_bit_offset = record_layout.getFieldOffset(discr_field.second);
       const uint64_t discr_value = data.GetMaxU64Bitfield(&byte_offset, byte_size, discr_bit_size, discr_bit_offset);
 
@@ -9161,17 +9175,13 @@ bool TypeSystemClang::DumpTypeValue(
         const clang::ASTRecordLayout &record_layout =
             getASTContext().getASTRecordLayout(record_decl);
 
-        unsigned int field_bit_size, field_bit_offset;
-        if (field->isBitField()) {
-          field_bit_size = field->getBitWidthValue(getASTContext());
-        }
-        else {
-          std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
-          assert(size && *size < UINT32_MAX);
-          field_bit_size = 8 * (unsigned int) *size;
-        }
-        field_bit_offset = record_layout.getFieldOffset(field_idx);
-        field_clang_type.DumpTypeValue(s, eFormatDefault, data, 0,
+        unsigned int field_bit_size = get_bit_size(field, field_idx);
+        unsigned int field_bit_offset = record_layout.getFieldOffset(field_idx);
+        // see line 485 of ocaml_value
+        DataExtractor field_data_extractor(data.GetDataStart(),
+            (field_bit_size + field_bit_offset) / 8,
+            data.GetByteOrder(), data.GetAddressByteSize());
+        field_clang_type.DumpTypeValue(s, eFormatDefault, field_data_extractor, 0,
             byte_size, field_bit_size, field_bit_offset,
             exe_scope);
       };
@@ -9182,6 +9192,7 @@ bool TypeSystemClang::DumpTypeValue(
       // Printing all the fields with the given discriminant (there can be multiple).
       uint32_t field_idx = 0;
       for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
+        uint64_t for_debugging = field_decl->getVariantDiscrValue();
         if (field_decl->getVariantDiscrValue() == discr_value) {
           print_field(field_decl, field_idx);
         }
@@ -9190,6 +9201,37 @@ bool TypeSystemClang::DumpTypeValue(
 
       s->PutCString("<END OF VARIANT>");
       // CR tnowak: currently format == eFormatBytes, is that a problem?
+      return true;
+    } break;
+
+    case clang::Type::LValueReference: {
+      uint64_t value = data.GetU64(&byte_offset);
+      assert(exe_scope);
+      ExecutionContext exe_ctx;
+      exe_scope->CalculateExecutionContext(exe_ctx);
+      Process *process = exe_ctx.GetProcessPtr();
+      assert(process);
+      clang::QualType underlying_type_qual = qual_type.getTypePtr()->getPointeeType();
+      assert(underlying_type_qual.getTypePtr()->getTypeClass() == clang::Type::Record);
+      const clang::RecordType *record_type =
+          llvm::cast<clang::RecordType>(underlying_type_qual.getTypePtr());
+      assert(record_type);
+      const clang::RecordDecl *record_decl = record_type->getDecl();
+      assert(record_decl);
+      const clang::CXXRecordDecl *cxx_record_decl =
+          llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
+      assert(cxx_record_decl);
+      value += cxx_record_decl->getOffsetRecordFromPointer();
+      Status error;
+      lldb::addr_t pointer = process->ReadPointerFromMemory(value, error);
+      assert(!error.Fail());
+      CompilerType underlying_type_compiler = GetType(underlying_type_qual);
+      std::optional<uint64_t> size = underlying_type_compiler.GetByteSize(exe_scope);
+      assert(size);
+
+      DataExtractor under_pointer(&pointer, *size,
+          process->GetByteOrder(), 8);
+      underlying_type_compiler.DumpTypeValue(s, eFormatDefault, under_pointer, 0, *size, *size * 8, 0, exe_scope);
       return true;
     } break;
 

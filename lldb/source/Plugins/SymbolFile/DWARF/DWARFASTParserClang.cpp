@@ -396,6 +396,9 @@ ParsedDWARFTypeAttributes::ParsedDWARFTypeAttributes(const DWARFDIE &die) {
     case DW_AT_reference:
       ref_qual = clang::RQ_LValue;
       break;
+    case DW_AT_offset_record_from_pointer:
+      offset_record_from_pointer = form_value.Signed();
+      break;
     }
   }
 }
@@ -1909,6 +1912,14 @@ DWARFASTParserClang::ParseStructureLikeDIE(const SymbolContext &sc,
     if (record_decl)
       record_decl->setArgPassingRestrictions(
           clang::RecordDecl::APK_CannotPassInRegs);
+  }
+
+  if (attrs.offset_record_from_pointer) {
+    // We're assuming it's being called from OCaml, so it has a CXXRecordDecl.
+    clang::CXXRecordDecl *record_decl =
+        m_ast.GetAsCXXRecordDecl(clang_type.GetOpaqueQualType());
+    assert(record_decl);
+    record_decl->setOffsetRecordFromPointer(attrs.offset_record_from_pointer);
   }
   return type_sp;
 }
