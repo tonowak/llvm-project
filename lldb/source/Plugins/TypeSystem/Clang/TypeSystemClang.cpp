@@ -9124,6 +9124,7 @@ bool TypeSystemClang::DumpTypeValue(
       // At this point, we know that the record represents a variant.
       // We first retrieve the CXXRecordDecl in which are the member fields
       // that contains the DW_AT_discr_value.
+      assert(GetCompleteType(type));
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(qual_type.getTypePtr());
       assert(record_type);
@@ -9132,12 +9133,62 @@ bool TypeSystemClang::DumpTypeValue(
       const clang::CXXRecordDecl *cxx_record_decl =
           llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
       assert(cxx_record_decl);
+
+      // Finding the {pointer, idx of child} of the field which contains the discriminant.
+      std::pair<clang::FieldDecl*, uint32_t> discr_field = {nullptr, 0};
       for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
-        // CR tnowak: TODO: remove this temporary printing.
-        s->PutULEB128(field_decl->getVariantDiscrValue());
+        if (!field_decl->hasVariantDiscrValue()) {
+          assert(!discr_field.first);
+          discr_field.first = field_decl;
+          break;
+        }
+        ++discr_field.second;
+      }
+      assert(discr_field.first);
+
+      // Getting the discriminant value. We're assuming that the discriminant
+      // is a bit field, but that isn't always true.
+      const clang::ASTRecordLayout &record_layout =
+          getASTContext().getASTRecordLayout(record_decl);
+      assert(discr_field.first->isBitField());
+      unsigned int discr_bit_size = discr_field.first->getBitWidthValue(getASTContext());
+      unsigned int discr_bit_offset = record_layout.getFieldOffset(discr_field.second);
+      const uint64_t discr_value = data.GetMaxU64Bitfield(&byte_offset, byte_size, discr_bit_size, discr_bit_offset);
+
+      auto print_field = [&](clang::FieldDecl *field, uint32_t field_idx) {
+        clang::QualType field_type = field->getType();
+        CompilerType field_clang_type = GetType(field_type);
+        const clang::ASTRecordLayout &record_layout =
+            getASTContext().getASTRecordLayout(record_decl);
+
+        unsigned int field_bit_size, field_bit_offset;
+        if (field->isBitField()) {
+          field_bit_size = field->getBitWidthValue(getASTContext());
+        }
+        else {
+          std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
+          assert(size && *size < UINT32_MAX);
+          field_bit_size = (unsigned int) *size;
+        }
+        field_bit_offset = record_layout.getFieldOffset(field_idx);
+        field_clang_type.DumpTypeValue(s, eFormatDefault, data, 0,
+            byte_size, field_bit_size, field_bit_offset,
+            exe_scope);
+      };
+      // We're assuming that the discriminant is an enum, so we're printing it.
+      print_field(discr_field.first, discr_field.second);
+      s->PutChar(' ');
+
+      // Printing all the fields with the given discriminant (there can be multiple).
+      uint32_t field_idx = 0;
+      for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
+        if (field_decl->getVariantDiscrValue() == discr_value) {
+          print_field(field_decl, field_idx);
+        }
+        ++field_idx;
       }
 
-      s->PutCString("IM A VARIANT!");
+      s->PutCString("<END OF VARIANT>");
       // CR tnowak: currently format == eFormatBytes, is that a problem?
       return true;
     } break;
