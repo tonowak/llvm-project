@@ -9168,7 +9168,7 @@ bool TypeSystemClang::DumpTypeValue(
         else {
           std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
           assert(size && *size < UINT32_MAX);
-          field_bit_size = (unsigned int) *size;
+          field_bit_size = 8 * (unsigned int) *size;
         }
         field_bit_offset = record_layout.getFieldOffset(field_idx);
         field_clang_type.DumpTypeValue(s, eFormatDefault, data, 0,
