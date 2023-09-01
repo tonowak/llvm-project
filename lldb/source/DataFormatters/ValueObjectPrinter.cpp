@@ -760,6 +760,7 @@ void ValueObjectPrinter::PrintChildrenIfNeeded(bool value_printed,
 
   DumpValueObjectOptions::PointerDepth curr_ptr_depth = m_ptr_depth;
   const bool print_children =
+      m_valobj->MightHaveChildren() &&
       ShouldPrintChildren(is_failed_description, curr_ptr_depth);
   const bool print_oneline =
       (curr_ptr_depth.CanAllowExpansion() || m_options.m_show_types ||

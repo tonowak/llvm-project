@@ -4024,7 +4024,7 @@ TypeSystemClang::GetTypeInfo(lldb::opaque_compiler_type_t type,
   case clang::Type::Record:
     if (clang::CXXRecordDecl *record_decl = qual_type->getAsCXXRecordDecl()) {
       if(record_decl->isVariant())
-        return eTypeHasValue | eTypeIsClass | eTypeIsCPlusPlus | eTypeOptionHideChildren;
+        return eTypeHasValue | eTypeIsClass | eTypeIsCPlusPlus;
       else
         return eTypeHasChildren | eTypeIsClass | eTypeIsCPlusPlus;
     }
