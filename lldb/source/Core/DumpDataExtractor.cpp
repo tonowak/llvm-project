@@ -516,13 +516,13 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
         case 254: { // Double_array_tag
           // N.B. Empty float arrays have tag zero
           uint64_t wosize_to_print = wosize <= 10 ? wosize : 10;
-          s->Printf("[|");
+          s->Printf("[| ");
           for (uint64_t field = 0; field < wosize_to_print; field++) {
             union {
               double f;
               uint64_t i;
             } u;
-            u.i = process->ReadUnsignedIntegerFromMemory(value, 8, 0, error);
+            u.i = process->ReadUnsignedIntegerFromMemory(value + 8 * field, 8, 0, error);
             if (error.Fail()) {
               s->Printf("<could not read floatarray field %" PRIu64 ">", field);
             } else {
@@ -532,13 +532,13 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
             }
 
             if (field < wosize_to_print - 1)
-              s->Printf(", ");
+              s->Printf("; ");
           }
           if (wosize_to_print < wosize) {
-            s->Printf(", <%" PRIu64 " more elements in floatarray>",
+            s->Printf("; <%" PRIu64 " more elements in floatarray>",
                       wosize - wosize_to_print);
           }
-          s->Printf("|]");
+          s->Printf(" |]");
 
           if (!error.Fail())
             print_default = false;
