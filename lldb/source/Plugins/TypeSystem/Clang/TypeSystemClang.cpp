@@ -9200,8 +9200,9 @@ bool TypeSystemClang::DumpTypeValue(
         } else {
           field_data_extractor = data;
         }
+        unsigned int field_byte_size = (field_bit_size + 8 - 1) / 8;
         field_clang_type.DumpTypeValue(s, eFormatDefault, field_data_extractor, 0,
-            byte_size, field_bit_size, field_bit_offset,
+            field_byte_size, field_bit_size, field_bit_offset,
             exe_scope);
       };
       // We're assuming that the discriminant is an enum, so we're printing it.
@@ -9210,15 +9211,17 @@ bool TypeSystemClang::DumpTypeValue(
 
       // Printing all the fields with the given discriminant (there can be multiple).
       uint32_t field_idx = 0;
+      int cnt_found_children = 0;
       for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
-        uint64_t for_debugging = field_decl->getVariantDiscrValue();
         if (field_decl->getVariantDiscrValue() == discr_value) {
+          ++cnt_found_children;
           s->PutChar(' ');
           print_field(field_decl, field_idx);
         }
         ++field_idx;
       }
       s->PutChar(')');
+      assert(cnt_found_children > 0);
 
       // CR tnowak: currently format == eFormatBytes, is that a problem?
       return true;
