@@ -1362,12 +1362,17 @@ bool ValueObject::DumpPrintableRepresentation(
       if (val_obj_display == eValueObjectRepresentationStyleValue)
         str = GetSummaryAsCString();
       else if (val_obj_display == eValueObjectRepresentationStyleSummary) {
+        // XXX mshinwell: need to test for OCaml language here.
         if (!CanProvideValue()) {
-          strm.Printf("%s @ %s", GetTypeName().AsCString(),
-                      GetLocationAsCString());
+          strm.Printf("<%s>", GetTypeName().AsCString());
+          // strm.Printf("%s @ %s", GetTypeName().AsCString(),
+          //           GetLocationAsCString());
           str = strm.GetString();
-        } else
-          str = GetValueAsCString();
+        } else {
+          strm.Printf("%s : %s", GetValueAsCString(), GetTypeName().AsCString());
+          str = strm.GetString();
+//          str = GetValueAsCString();
+        }
       }
     }
 
