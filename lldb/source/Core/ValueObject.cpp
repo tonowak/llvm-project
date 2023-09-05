@@ -1147,6 +1147,7 @@ bool ValueObject::HasSpecialPrintableRepresentation(
       return true;
 
     if (flags.Test(eTypeIsArray)) {
+      // XXX mshinwell: this should be disabled for OCaml
       if ((custom_format == eFormatBytes) ||
           (custom_format == eFormatBytesWithASCII))
         return true;

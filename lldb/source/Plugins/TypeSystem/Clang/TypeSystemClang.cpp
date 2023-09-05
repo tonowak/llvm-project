@@ -2288,7 +2288,7 @@ using namespace std;
 CompilerType TypeSystemClang::CreateArrayType(const CompilerType &element_type,
                                               size_t element_count,
                                               bool is_vector) {
-  cerr << "CreateArrayType " << ClangUtil::GetQualType(element_type).getAsString() << " " << element_count << " " << is_vector << "\n";
+//  cerr << "CreateArrayType " << ClangUtil::GetQualType(element_type).getAsString() << " " << element_count << " " << is_vector << "\n";
   if (element_type.IsValid()) {
     ASTContext &ast = getASTContext();
 
@@ -8673,7 +8673,7 @@ void TypeSystemClang::DumpValue(
           field_byte_offset = field_bit_offset / 8;
           assert(field_bit_offset % 8 == 0);
           if (child_idx == 0)
-            s->PutChar('{');
+            s->PutChar('!');
           else
             s->PutChar(',');
 
@@ -8719,7 +8719,7 @@ void TypeSystemClang::DumpValue(
         // Print the starting squiggly bracket (if this is the first member) or
         // comma (for member 2 and beyond) for the struct/union/class member.
         if (child_idx == 0)
-          s->PutChar('{');
+          s->PutChar('$');
         else
           s->PutChar(',');
 
@@ -8841,7 +8841,7 @@ void TypeSystemClang::DumpValue(
         // Print the starting squiggly bracket (if this is the first member) or
         // comman (for member 2 and beyong) for the struct/union/class member.
         if (element_idx == 0)
-          s->PutChar('{');
+          s->PutChar('^');
         else
           s->PutChar(',');
 
@@ -9083,9 +9083,14 @@ bool TypeSystemClang::DumpTypeValue(
     ExecutionContextScope *exe_scope) {
   if (!type)
     return false;
-  if (IsAggregateType(type)) {
-    clang::QualType qual_type(GetQualType(type));
-cerr << "not an aggregate type " << qual_type.getAsString() << endl;
+  bool is_ocaml = true; // XXX mshinwell
+  CompilerType array_element_type;
+  bool is_ocaml_array = is_ocaml
+    && IsArrayType(type, &array_element_type, nullptr, nullptr);
+  clang::QualType qual_type(GetQualType(type));
+//  cerr << "type " << qual_type.getAsString() << " is_ocaml_array " << is_ocaml_array << "\n";
+  if (IsAggregateType(type) && !is_ocaml_array) {
+ //   cerr << "aggregate return" << endl;
     return false;
   } else {
     clang::QualType qual_type(GetQualType(type));
@@ -9096,11 +9101,47 @@ cerr << "not an aggregate type " << qual_type.getAsString() << endl;
                                exe_scope);
     }
 
+    if (is_ocaml_array) {
+//cerr << "(array) printing type" << qual_type.getAsString() << endl;
+
+      std::vector<uint8_t> buffer;
+      ExecutionContext exe_ctx;
+      exe_scope->CalculateExecutionContext(exe_ctx);
+      Process *process = exe_ctx.GetProcessPtr();
+      assert(process);
+
+      lldb::addr_t header_addr = data.getDataOriginalSource() - 8;
+      Status error;
+      uint64_t header =
+        process->ReadUnsignedIntegerFromMemory(header_addr, 8, 0, error);
+      assert(!error.Fail());
+
+      uint64_t num_elements = header >> 10;
+
+      buffer.resize(num_elements * 8);
+      size_t bytes_read;
+      bytes_read =
+          process->ReadMemory(data.getDataOriginalSource (),
+          &buffer.front(), buffer.size(), error);
+      assert(bytes_read == buffer.size() && !error.Fail());
+      DataExtractor element_data_extractor =
+        DataExtractor(&buffer.front(), buffer.size(),
+          data.GetByteOrder(), data.GetAddressByteSize());
+
+      s->PutCString("[| ");
+      uint64_t field;
+      for (field = 0; field < num_elements; field++) {
+        array_element_type.DumpTypeValue(s, eFormatDefault,
+          element_data_extractor, field * 8, 8, 64, 0, exe_scope);
+        if (field < num_elements - 1) s->PutCString("; ");
+      }
+      s->PutCString(" |]");
+      return true;
+    }
+
     const clang::Type::TypeClass type_class = qual_type->getTypeClass();
-cerr << "type class is " << (int) type_class << endl;
 
     if (type_class == clang::Type::Elaborated) {
-cerr << "(elaborated) printing type " << qual_type.getAsString() << endl;
       qual_type = llvm::cast<clang::ElaboratedType>(qual_type)->getNamedType();
       return DumpTypeValue(qual_type.getAsOpaquePtr(), s, format, data,
                            byte_offset, byte_size, bitfield_bit_size,
@@ -9134,8 +9175,6 @@ cerr << "(elaborated) printing type " << qual_type.getAsString() << endl;
     } break;
 
     case clang::Type::Record: {
-      CompilerType array_element_type;
-
       assert(GetCompleteType(type));
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(qual_type.getTypePtr());
@@ -9239,40 +9278,11 @@ cerr << "(elaborated) printing type " << qual_type.getAsString() << endl;
         s->PutChar(')');
         assert(cnt_found_children > 0);
       }
-      else if (IsArrayType(type, &array_element_type, nullptr, nullptr)) {
-cerr << "(array) printing type" << qual_type.getAsString() << endl;
-        lldb::addr_t header_addr = data.getDataOriginalSource() - 8;
-        Status error;
-        uint64_t header =
-          process->ReadUnsignedIntegerFromMemory(header_addr, 8, 0, error);
-        assert(!error.Fail());
-
-        uint64_t num_elements = header >> 10;
-
-        buffer.resize(num_elements * 8);
-        size_t bytes_read;
-        bytes_read =
-            process->ReadMemory(data.getDataOriginalSource (),
-            &buffer.front(), buffer.size(), error);
-        assert(bytes_read == buffer.size() && !error.Fail());
-        DataExtractor element_data_extractor =
-          DataExtractor(&buffer.front(), buffer.size(),
-            data.GetByteOrder(), data.GetAddressByteSize());
-
-        s->PutCString("[| ");
-        uint64_t field;
-        for (field = 0; field < num_elements; field++) {
-          array_element_type.DumpTypeValue(s, eFormatDefault,
-            element_data_extractor, field * 8, 8, 64, 0, exe_scope);
-        }
-        s->PutCString(" |]");
-      } else {
+      else {
         bool is_tuple = true;
         for (clang::FieldDecl *field_decl : cxx_record_decl->fields())
           if (!field_decl->getName().empty())
             is_tuple = false;
-
-cerr << "(tuple) printing type" << qual_type.getAsString() << endl;
 
         s->PutCString(is_tuple ? "(" : "{ ");
         unsigned int idx = 0;
@@ -9312,6 +9322,14 @@ cerr << "(tuple) printing type" << qual_type.getAsString() << endl;
       Process *process = exe_ctx.GetProcessPtr();
       assert(process);
       clang::QualType underlying_type_qual = qual_type.getTypePtr()->getPointeeType();
+      CompilerType underlying_type_compiler = GetType(underlying_type_qual);
+      if (underlying_type_qual.getTypePtr()->isArrayType()) {
+        DataExtractor data2(data);
+        data2.setDataOriginalSource(value);
+        underlying_type_compiler.DumpTypeValue(s, eFormatDefault, data2,
+          0, 8, 64, 0, exe_scope);
+        return true;
+      }
       assert(underlying_type_qual.getTypePtr()->getTypeClass() == clang::Type::Record);
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(underlying_type_qual.getTypePtr());
@@ -9323,7 +9341,6 @@ cerr << "(tuple) printing type" << qual_type.getAsString() << endl;
       assert(cxx_record_decl);
       value += cxx_record_decl->getOffsetRecordFromPointer();
 
-      CompilerType underlying_type_compiler = GetType(underlying_type_qual);
       std::optional<uint64_t> size = underlying_type_compiler.GetByteSize(exe_scope);
       assert(size);
 
