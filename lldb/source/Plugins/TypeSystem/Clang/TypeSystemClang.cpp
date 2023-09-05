@@ -9120,8 +9120,9 @@ bool TypeSystemClang::DumpTypeValue(
 
       buffer.resize(num_elements * 8);
       size_t bytes_read;
+      lldb::addr_t block_addr = data.getDataOriginalSource();
       bytes_read =
-          process->ReadMemory(data.getDataOriginalSource (),
+          process->ReadMemory(block_addr,
           &buffer.front(), buffer.size(), error);
       assert(bytes_read == buffer.size() && !error.Fail());
       DataExtractor element_data_extractor =
@@ -9131,6 +9132,7 @@ bool TypeSystemClang::DumpTypeValue(
       s->PutCString("[| ");
       uint64_t field;
       for (field = 0; field < num_elements; field++) {
+        element_data_extractor.setDataOriginalSource(block_addr + field * 8);
         array_element_type.DumpTypeValue(s, eFormatDefault,
           element_data_extractor, field * 8, 8, 64, 0, exe_scope);
         if (field < num_elements - 1) s->PutCString("; ");

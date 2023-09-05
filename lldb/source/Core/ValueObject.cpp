@@ -1364,13 +1364,19 @@ bool ValueObject::DumpPrintableRepresentation(
         str = GetSummaryAsCString();
       else if (val_obj_display == eValueObjectRepresentationStyleSummary) {
         // XXX mshinwell: need to test for OCaml language here.
+        std::string type_name_str(GetTypeName().AsCString());
+        std::string to_erase("(&) ");
+        for (auto iter = type_name_str.find(to_erase); iter != std::string::npos;
+             iter = type_name_str.find(to_erase)) {
+          type_name_str.erase(iter, to_erase.size());
+        }
         if (!CanProvideValue()) {
-          strm.Printf("<%s>", GetTypeName().AsCString());
+          strm.Printf("<unavailable> : %s", type_name_str.c_str());
           // strm.Printf("%s @ %s", GetTypeName().AsCString(),
           //           GetLocationAsCString());
           str = strm.GetString();
         } else {
-          strm.Printf("%s : %s", GetValueAsCString(), GetTypeName().AsCString());
+          strm.Printf("%s : %s", GetValueAsCString(), type_name_str.c_str());
           str = strm.GetString();
 //          str = GetValueAsCString();
         }
