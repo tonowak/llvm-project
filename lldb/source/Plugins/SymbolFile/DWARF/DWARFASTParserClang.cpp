@@ -1914,11 +1914,10 @@ DWARFASTParserClang::ParseStructureLikeDIE(const SymbolContext &sc,
           clang::RecordDecl::APK_CannotPassInRegs);
   }
 
-  if (attrs.offset_record_from_pointer) {
-    // We're assuming it's being called from OCaml, so it has a CXXRecordDecl.
-    clang::CXXRecordDecl *record_decl =
-        m_ast.GetAsCXXRecordDecl(clang_type.GetOpaqueQualType());
-    assert(record_decl);
+  clang::CXXRecordDecl *record_decl =
+      m_ast.GetAsCXXRecordDecl(clang_type.GetOpaqueQualType());
+  if (record_decl) {
+    record_decl->setImplicit();
     record_decl->setOffsetRecordFromPointer(attrs.offset_record_from_pointer);
   }
   return type_sp;
@@ -2947,8 +2946,9 @@ void DWARFASTParserClang::ParseSingleMember(
   // artificial member with (unnamed bitfield) padding.
   // FIXME: This check should verify that this is indeed an artificial member
   // we are supposed to ignore.
-  if (attrs.is_artificial)
-    return;
+  // if (attrs.is_artificial)
+    // return; // CR tnowak: make a more permament solution than commenting out code.
+  if (!attrs.is_artificial)
 
   if (!member_clang_type.IsCompleteType())
     member_clang_type.GetCompleteType();
@@ -2992,7 +2992,7 @@ void DWARFASTParserClang::ParseSingleMember(
 
   clang::FieldDecl *field_decl = TypeSystemClang::AddFieldToRecordType(
       class_clang_type, attrs.name, member_clang_type, attrs.accessibility,
-      attrs.bit_size, variant_discr_value);
+      attrs.bit_size, variant_discr_value, attrs.is_artificial);
 
   m_ast.SetMetadataAsUserID(field_decl, die.GetID());
 

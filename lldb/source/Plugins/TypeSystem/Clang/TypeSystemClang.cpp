@@ -7409,7 +7409,7 @@ TypeSystemClang::GetAsObjCInterfaceDecl(const CompilerType &type) {
 clang::FieldDecl *TypeSystemClang::AddFieldToRecordType(
     const CompilerType &type, llvm::StringRef name,
     const CompilerType &field_clang_type, AccessType access,
-    uint32_t bitfield_bit_size, uint64_t variant_discr_value) {
+    uint32_t bitfield_bit_size, uint64_t variant_discr_value, bool is_artificial) {
   if (!type.IsValid() || !field_clang_type.IsValid())
     return nullptr;
   auto ts = type.GetTypeSystem();
@@ -7441,6 +7441,8 @@ clang::FieldDecl *TypeSystemClang::AddFieldToRecordType(
     if (bit_width)
       field->setBitWidth(bit_width);
     field->setVariantDiscrValue(variant_discr_value);
+    if (is_artificial)
+      record_decl->setImplicit(false);
     SetMemberOwningModule(field, record_decl);
 
     if (name.empty()) {
@@ -9140,6 +9142,8 @@ bool TypeSystemClang::DumpTypeValue(
           llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
       assert(cxx_record_decl);
 
+      bool is_artificial = !cxx_record_decl->isImplicit();
+
       if (cxx_record_decl->isVariant()) {
         // Finding the {pointer, idx of child} of the field which contains the discriminant.
         std::pair<clang::FieldDecl*, uint32_t> discr_field = {nullptr, 0};
@@ -9214,9 +9218,12 @@ bool TypeSystemClang::DumpTypeValue(
               field_byte_size, field_bit_size, field_bit_offset,
               exe_scope);
         };
-        // We're assuming that the discriminant is an enum, so we're printing it.
-        s->PutChar('(');
-        print_field(discr_field.first, discr_field.second);
+        if (!is_artificial) {
+          // We're assuming that the discriminant is an enum, so we're printing it.
+          s->PutChar('(');
+          print_field(discr_field.first, discr_field.second);
+          s->PutChar(' ');
+        }
 
         // First checking whether the variant's arguments are a tuple or a record.
         bool is_tuple = true;
@@ -9228,7 +9235,8 @@ bool TypeSystemClang::DumpTypeValue(
         }
 
         // Printing all the fields with the given discriminant (there can be multiple).
-        s->PutCString(is_tuple ? " " : " { ");
+        if (!is_tuple)
+          s->PutCString("{ ");
         uint32_t field_idx = 0;
         int cnt_found_children = 0;
         for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
@@ -9245,7 +9253,8 @@ bool TypeSystemClang::DumpTypeValue(
         }
         if (not is_tuple)
           s->PutCString(" }");
-        s->PutChar(')');
+        if (!is_artificial)
+          s->PutChar(')');
         assert(cnt_found_children > 0);
       }
       else {
