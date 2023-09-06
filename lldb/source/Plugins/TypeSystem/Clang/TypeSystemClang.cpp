@@ -2283,9 +2283,13 @@ TypeSystemClang::CreateBlockPointerType(const CompilerType &function_type) {
 
 #pragma mark Array Types
 
+#include <iostream>
+using namespace std;
+
 CompilerType TypeSystemClang::CreateArrayType(const CompilerType &element_type,
                                               size_t element_count,
                                               bool is_vector) {
+//  cerr << "CreateArrayType " << ClangUtil::GetQualType(element_type).getAsString() << " " << element_count << " " << is_vector << "\n";
   if (element_type.IsValid()) {
     ASTContext &ast = getASTContext();
 
@@ -8672,7 +8676,7 @@ void TypeSystemClang::DumpValue(
           field_byte_offset = field_bit_offset / 8;
           assert(field_bit_offset % 8 == 0);
           if (child_idx == 0)
-            s->PutChar('{');
+            s->PutChar('!');
           else
             s->PutChar(',');
 
@@ -8718,7 +8722,7 @@ void TypeSystemClang::DumpValue(
         // Print the starting squiggly bracket (if this is the first member) or
         // comma (for member 2 and beyond) for the struct/union/class member.
         if (child_idx == 0)
-          s->PutChar('{');
+          s->PutChar('$');
         else
           s->PutChar(',');
 
@@ -8840,7 +8844,7 @@ void TypeSystemClang::DumpValue(
         // Print the starting squiggly bracket (if this is the first member) or
         // comman (for member 2 and beyong) for the struct/union/class member.
         if (element_idx == 0)
-          s->PutChar('{');
+          s->PutChar('^');
         else
           s->PutChar(',');
 
@@ -9082,7 +9086,14 @@ bool TypeSystemClang::DumpTypeValue(
     ExecutionContextScope *exe_scope) {
   if (!type)
     return false;
-  if (IsAggregateType(type)) {
+  bool is_ocaml = true; // XXX mshinwell
+  CompilerType array_element_type;
+  bool is_ocaml_array = is_ocaml
+    && IsArrayType(type, &array_element_type, nullptr, nullptr);
+//  clang::QualType qual_type(GetQualType(type));
+//  cerr << "type " << qual_type.getAsString() << " is_ocaml_array " << is_ocaml_array << "\n";
+  if (IsAggregateType(type) && !is_ocaml_array) {
+ //   cerr << "aggregate return" << endl;
     return false;
   } else {
     clang::QualType qual_type(GetQualType(type));
@@ -9091,6 +9102,46 @@ bool TypeSystemClang::DumpTypeValue(
       return DumpDataExtractor(data, s, byte_offset, eFormatOCamlValue, 8, 1,
                                UINT32_MAX, LLDB_INVALID_ADDRESS, 0, 0,
                                exe_scope);
+    }
+
+    if (is_ocaml_array) {
+//cerr << "(array) printing type" << qual_type.getAsString() << endl;
+
+      std::vector<uint8_t> buffer;
+      ExecutionContext exe_ctx;
+      exe_scope->CalculateExecutionContext(exe_ctx);
+      Process *process = exe_ctx.GetProcessPtr();
+      assert(process);
+
+      lldb::addr_t header_addr = data.getDataOriginalSource() - 8;
+      Status error;
+      uint64_t header =
+        process->ReadUnsignedIntegerFromMemory(header_addr, 8, 0, error);
+      assert(!error.Fail());
+
+      uint64_t num_elements = header >> 10;
+
+      buffer.resize(num_elements * 8);
+      size_t bytes_read;
+      lldb::addr_t block_addr = data.getDataOriginalSource();
+      bytes_read =
+          process->ReadMemory(block_addr,
+          &buffer.front(), buffer.size(), error);
+      assert(bytes_read == buffer.size() && !error.Fail());
+      DataExtractor element_data_extractor =
+        DataExtractor(&buffer.front(), buffer.size(),
+          data.GetByteOrder(), data.GetAddressByteSize());
+
+      s->PutCString("[| ");
+      uint64_t field;
+      for (field = 0; field < num_elements; field++) {
+        element_data_extractor.setDataOriginalSource(block_addr + field * 8);
+        array_element_type.DumpTypeValue(s, eFormatDefault,
+          element_data_extractor, field * 8, 8, 64, 0, exe_scope);
+        if (field < num_elements - 1) s->PutCString("; ");
+      }
+      s->PutCString(" |]");
+      return true;
     }
 
     const clang::Type::TypeClass type_class = qual_type->getTypeClass();
@@ -9129,9 +9180,6 @@ bool TypeSystemClang::DumpTypeValue(
     } break;
 
     case clang::Type::Record: {
-      // At this point, we know that the record represents a variant.
-      // We first retrieve the CXXRecordDecl in which are the member fields
-      // that contains the DW_AT_discr_value.
       assert(GetCompleteType(type));
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(qual_type.getTypePtr());
@@ -9144,7 +9192,17 @@ bool TypeSystemClang::DumpTypeValue(
 
       bool is_artificial = !cxx_record_decl->isImplicit();
 
+      ExecutionContext exe_ctx;
+      exe_scope->CalculateExecutionContext(exe_ctx);
+      Process *process = exe_ctx.GetProcessPtr();
+      assert(process);
+
+      std::vector<uint8_t> buffer;
+
       if (cxx_record_decl->isVariant()) {
+        // At this point, we know that the record represents a variant.
+        // We first retrieve the CXXRecordDecl in which are the member fields
+        // that contains the DW_AT_discr_value.
         // Finding the {pointer, idx of child} of the field which contains the discriminant.
         std::pair<clang::FieldDecl*, uint32_t> discr_field = {nullptr, 0};
         for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
@@ -9180,11 +9238,6 @@ bool TypeSystemClang::DumpTypeValue(
         lldb::offset_t discr_byte_offset = byte_offset;
         const uint64_t discr_value = data.GetMaxU64Bitfield(&discr_byte_offset, byte_size, discr_bit_size, discr_bit_offset);
 
-        ExecutionContext exe_ctx;
-        exe_scope->CalculateExecutionContext(exe_ctx);
-        Process *process = exe_ctx.GetProcessPtr();
-        assert(process);
-
         auto print_field = [&](clang::FieldDecl *field, uint32_t field_idx) {
           clang::QualType field_type = field->getType();
           CompilerType field_clang_type = GetType(field_type);
@@ -9194,7 +9247,6 @@ bool TypeSystemClang::DumpTypeValue(
           unsigned int field_bit_size = get_bit_size(field, field_idx);
           unsigned int field_bit_offset = record_layout.getFieldOffset(field_idx);
           unsigned int field_byte_size = (field_bit_size + 8 - 1) / 8;
-          std::vector<uint8_t> buffer;
           DataExtractor field_data_extractor;
           lldb::offset_t data_offset;
           if (data.getDataOriginalSource()) {
@@ -9308,6 +9360,7 @@ bool TypeSystemClang::DumpTypeValue(
       Process *process = exe_ctx.GetProcessPtr();
       assert(process);
       clang::QualType underlying_type_qual = qual_type.getTypePtr()->getPointeeType();
+      CompilerType underlying_type_compiler = GetType(underlying_type_qual);
 
       clang::QualType record_qual = underlying_type_qual;
       while (record_qual.getTypePtr()->getTypeClass() == clang::Type::Typedef)
@@ -9315,6 +9368,13 @@ bool TypeSystemClang::DumpTypeValue(
           llvm::cast<clang::TypedefType>(record_qual)
               ->getDecl()
               ->getUnderlyingType();
+      if (record_qual.getTypePtr()->isArrayType()) {
+        DataExtractor data2(data);
+        data2.setDataOriginalSource(value);
+        underlying_type_compiler.DumpTypeValue(s, eFormatDefault, data2,
+          0, 8, 64, 0, exe_scope);
+        return true;
+      }
       assert(record_qual.getTypePtr()->getTypeClass() == clang::Type::Record);
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(record_qual.getTypePtr());
@@ -9326,7 +9386,6 @@ bool TypeSystemClang::DumpTypeValue(
       assert(cxx_record_decl);
       value += cxx_record_decl->getOffsetRecordFromPointer();
 
-      CompilerType underlying_type_compiler = GetType(underlying_type_qual);
       std::optional<uint64_t> size = underlying_type_compiler.GetByteSize(exe_scope);
       assert(size);
 

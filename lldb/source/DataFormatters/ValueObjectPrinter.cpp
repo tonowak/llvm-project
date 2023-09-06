@@ -220,6 +220,7 @@ bool ValueObjectPrinter::PrintLocationIfNeeded() {
 }
 
 void ValueObjectPrinter::PrintDecl() {
+  bool is_ocaml = true; // XXX
   bool show_type = true;
   // if we are at the root-level and been asked to hide the root's type, then
   // hide it
@@ -257,7 +258,13 @@ void ValueObjectPrinter::PrintDecl() {
           type_name_str.erase(iter, 2);
         }
       }
-      typeName << type_name_str.c_str();
+      if (is_ocaml) {
+        std::string to_erase("(&) ");
+        for (auto iter = type_name_str.find(to_erase); iter != std::string::npos;
+             iter = type_name_str.find(to_erase)) {
+          type_name_str.erase(iter, to_erase.size());
+        }
+      }
     }
   }
 
@@ -672,6 +679,7 @@ void ValueObjectPrinter::PrintChildren(
     bool any_children_printed = false;
 
     for (size_t idx = 0; idx < num_children; ++idx) {
+      // mshinwell: maybe we could use synthetic children for array printing?
       if (ValueObjectSP child_sp = GenerateChild(synth_m_valobj, idx)) {
         if (!any_children_printed) {
           PrintChildrenPreamble();
@@ -685,15 +693,20 @@ void ValueObjectPrinter::PrintChildren(
       PrintChildrenPostamble(print_dotdotdot);
     else {
       if (ShouldPrintEmptyBrackets(value_printed, summary_printed)) {
+        /* XXX don't want {} after arrays
         if (ShouldPrintValueObject())
           m_stream->PutCString(" {}\n");
         else
+        */
           m_stream->EOL();
       } else
         m_stream->EOL();
     }
   } else if (ShouldPrintEmptyBrackets(value_printed, summary_printed)) {
     // Aggregate, no children...
+    m_stream->PutCString("\n");
+// XXX mshinwell
+/*
     if (ShouldPrintValueObject()) {
       // if it has a synthetic value, then don't print {}, the synthetic
       // children are probably only being used to vend a value
@@ -703,6 +716,7 @@ void ValueObjectPrinter::PrintChildren(
       else
         m_stream->PutCString(" {}\n");
     }
+*/
   } else {
     if (ShouldPrintValueObject())
       m_stream->EOL();
