@@ -9273,22 +9273,27 @@ bool TypeSystemClang::DumpTypeValue(
 
         // First checking whether the variant's arguments are a tuple or a record.
         bool is_tuple = true;
+        int cnt_found_children = 0;
         for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
           if (field_decl->getVariantDiscrValue() == discr_value) {
             if (!field_decl->getName().empty())
               is_tuple = false;
+            ++cnt_found_children;
           }
         }
+        assert(cnt_found_children > 0);
 
         // Printing all the fields with the given discriminant (there can be multiple).
-        if (!is_tuple)
+        if (is_tuple)
+          s->PutCString(cnt_found_children > 1 ? "(" : "");
+        else
           s->PutCString("{ ");
         uint32_t field_idx = 0;
-        int cnt_found_children = 0;
+        cnt_found_children = 0;
         for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
           if (field_decl->getVariantDiscrValue() == discr_value) {
             if (cnt_found_children++ > 0)
-              s->PutCString(is_tuple ? " " : "; ");
+              s->PutCString(is_tuple ? ", " : "; ");
             if (!field_decl->getName().empty()) {
               s->PutCString(field_decl->getName());
               s->PutCString(" = ");
@@ -9297,11 +9302,11 @@ bool TypeSystemClang::DumpTypeValue(
           }
           ++field_idx;
         }
-        if (not is_tuple)
+        if (is_tuple)
+          s->PutCString(cnt_found_children > 1 ? ")" : "");
+        else
           s->PutCString(" }");
-        if (!is_artificial)
-          s->PutChar(')');
-        assert(cnt_found_children > 0);
+        s->PutChar(')');
       }
       else {
         bool is_tuple = true;
