@@ -296,9 +296,6 @@ bool Value::GetData(DataExtractor &data) {
   return false;
 }
 
-#include <iostream>
-using namespace std;
-
 Status Value::GetValueAsData(ExecutionContext *exe_ctx, DataExtractor &data,
                              Module *module) {
   data.Clear();
@@ -313,8 +310,6 @@ Status Value::GetValueAsData(ExecutionContext *exe_ctx, DataExtractor &data,
   // Nothing to be done for a zero-sized type.
   if (type_size && *type_size == 0)
     return error;
-
-//  cerr << "GetValueAsData: " << ast_type.GetDisplayTypeName ().AsCString() << "\n";
 
   switch (m_value_type) {
   case ValueType::Invalid:

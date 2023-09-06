@@ -200,8 +200,6 @@ public:
     llvm::SmallVector<uint64_t, 1> element_orders;
     uint32_t byte_stride = 0;
     uint32_t bit_stride = 0;
-    //    bool computed_num_elements = 0;
-    //    std::function<uint64_t(lldb::ModuleSP, Value *)> compute_num_elements;
   };
   /// If \c type_uid points to an array type, return its characteristics.
   /// To support variable-length array types, this function takes an

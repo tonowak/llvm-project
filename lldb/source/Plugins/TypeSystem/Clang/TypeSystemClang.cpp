@@ -2283,13 +2283,9 @@ TypeSystemClang::CreateBlockPointerType(const CompilerType &function_type) {
 
 #pragma mark Array Types
 
-#include <iostream>
-using namespace std;
-
 CompilerType TypeSystemClang::CreateArrayType(const CompilerType &element_type,
                                               size_t element_count,
                                               bool is_vector) {
-//  cerr << "CreateArrayType " << ClangUtil::GetQualType(element_type).getAsString() << " " << element_count << " " << is_vector << "\n";
   if (element_type.IsValid()) {
     ASTContext &ast = getASTContext();
 
@@ -2855,7 +2851,6 @@ bool TypeSystemClang::IsAggregateType(lldb::opaque_compiler_type_t type) {
   case clang::Type::ConstantArray:
   case clang::Type::ExtVector:
   case clang::Type::Vector:
-  // case clang::Type::Record: CR tnowak: verify this
   case clang::Type::ObjCObject:
   case clang::Type::ObjCInterface:
     return true;
@@ -5324,8 +5319,7 @@ lldb::Format TypeSystemClang::GetFormat(lldb::opaque_compiler_type_t type) {
   case clang::Type::ObjCInterface:
     break;
   case clang::Type::Record:
-  // CR tnowak: maybe return the format type here?
-    break;
+    return lldb::eFormatDefault;
   case clang::Type::Enum:
     return lldb::eFormatEnum;
   case clang::Type::DependentSizedArray:
@@ -9090,10 +9084,7 @@ bool TypeSystemClang::DumpTypeValue(
   CompilerType array_element_type;
   bool is_ocaml_array = is_ocaml
     && IsArrayType(type, &array_element_type, nullptr, nullptr);
-//  clang::QualType qual_type(GetQualType(type));
-//  cerr << "type " << qual_type.getAsString() << " is_ocaml_array " << is_ocaml_array << "\n";
   if (IsAggregateType(type) && !is_ocaml_array) {
- //   cerr << "aggregate return" << endl;
     return false;
   } else {
     clang::QualType qual_type(GetQualType(type));
@@ -9105,8 +9096,6 @@ bool TypeSystemClang::DumpTypeValue(
     }
 
     if (is_ocaml_array) {
-//cerr << "(array) printing type" << qual_type.getAsString() << endl;
-
       std::vector<uint8_t> buffer;
       ExecutionContext exe_ctx;
       exe_scope->CalculateExecutionContext(exe_ctx);
@@ -9354,7 +9343,6 @@ bool TypeSystemClang::DumpTypeValue(
         s->PutCString(is_tuple ? ")" : " }");
       }
 
-      // CR tnowak: currently format == eFormatBytes, is that a problem?
       return true;
     } break;
 
