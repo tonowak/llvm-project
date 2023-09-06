@@ -9198,7 +9198,6 @@ bool TypeSystemClang::DumpTypeValue(
           DataExtractor field_data_extractor;
           lldb::offset_t data_offset;
           if (data.getDataOriginalSource()) {
-            assert(field_bit_offset % 8 == 0);
             lldb::addr_t field_addr = data.getDataOriginalSource() + (byte_offset + field_bit_offset / 8);
             buffer.resize(field_byte_size);
             size_t bytes_read;
@@ -9214,7 +9213,7 @@ bool TypeSystemClang::DumpTypeValue(
             field_data_extractor = data;
             data_offset = byte_offset;
           }
-          field_clang_type.DumpTypeValue(s, eFormatDefault, field_data_extractor, data_offset,
+          field_clang_type.DumpTypeValue(s, field_clang_type.GetFormat(), field_data_extractor, data_offset,
               field_byte_size, field_bit_size, field_bit_offset,
               exe_scope);
         };
@@ -9274,15 +9273,23 @@ bool TypeSystemClang::DumpTypeValue(
           }
           clang::QualType field_type = field_decl->getType();
           CompilerType field_clang_type = GetType(field_type);
-          std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
-          assert(size && *size < UINT32_MAX);
+          unsigned int field_bit_size;
+          if (field_decl->isBitField()) {
+            field_bit_size = field_decl->getBitWidthValue(getASTContext());
+          }
+          else {
+            std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
+            assert(size && *size < UINT32_MAX);
+            field_bit_size = 8 * (unsigned int) *size;
+          }
+          unsigned int field_byte_size = (field_bit_size + 8 - 1) / 8;
           const clang::ASTRecordLayout &record_layout =
               getASTContext().getASTRecordLayout(record_decl);
           unsigned int field_bit_offset = record_layout.getFieldOffset(idx);
-          assert(field_bit_offset % 8 == 0);
           unsigned int field_byte_offset = field_bit_offset / 8;
-          field_clang_type.DumpTypeValue(s, eFormatDefault, data, field_byte_offset,
-              *size, 8 * *size, 0,
+          field_bit_offset %= 8;
+          field_clang_type.DumpTypeValue(s, field_clang_type.GetFormat(), data, field_byte_offset,
+              field_byte_size, field_bit_size, field_bit_offset,
               exe_scope);
           ++idx;
         }
@@ -9335,7 +9342,8 @@ bool TypeSystemClang::DumpTypeValue(
       DataExtractor under_pointer(&buffer.front(), *size,
           process->GetByteOrder(), 8);
       under_pointer.setDataOriginalSource(value);
-      underlying_type_compiler.DumpTypeValue(s, eFormatDefault, under_pointer, 0, *size, *size * 8, 0, exe_scope);
+      underlying_type_compiler.DumpTypeValue(s, underlying_type_compiler.GetFormat(),
+          under_pointer, 0, *size, *size * 8, 0, exe_scope);
       return true;
     } break;
 
