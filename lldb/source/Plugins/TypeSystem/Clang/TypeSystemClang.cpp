@@ -9120,6 +9120,14 @@ bool TypeSystemClang::DumpTypeValue(
       assert(!error.Fail());
 
       uint64_t num_elements = header >> 10;
+      uint64_t tag = header & 0xff;
+
+      // With the float optimization enabled the DWARF isn't always
+      // accurate, so we need to watch out for Double_array_tag.
+      if (tag == 254)
+        return DumpDataExtractor(data, s, byte_offset, eFormatOCamlValue, 8, 1,
+                                UINT32_MAX, LLDB_INVALID_ADDRESS, 0, 0,
+                                exe_scope);
 
       buffer.resize(num_elements * 8);
       size_t bytes_read;
