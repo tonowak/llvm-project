@@ -9136,14 +9136,12 @@ bool TypeSystemClang::DumpTypeValue(
           process->ReadMemory(block_addr,
           &buffer.front(), buffer.size(), error);
       assert(bytes_read == buffer.size() && !error.Fail());
-      DataExtractor element_data_extractor =
-        DataExtractor(&buffer.front(), buffer.size(),
+      DataExtractor element_data_extractor(&buffer.front(), buffer.size(),
           data.GetByteOrder(), data.GetAddressByteSize());
 
       s->PutCString("[| ");
       uint64_t field;
       for (field = 0; field < num_elements; field++) {
-        element_data_extractor.setDataOriginalSource(block_addr + field * 8);
         array_element_type.DumpTypeValue(s, eFormatDefault,
           element_data_extractor, field * 8, 8, 64, 0, exe_scope);
         if (field < num_elements - 1) s->PutCString("; ");
