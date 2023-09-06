@@ -529,6 +529,12 @@ static offset_t FormatOCamlValue(const DataExtractor &DE, Stream *s,
               // CR mshinwell: should probably use proper float printing code
               // elsewhere in this file
               s->Printf("%g", u.f);
+              if (ceilf(u.f) == u.f) {
+                // Following OCaml conventions, print the trailing "." to
+                // identify that the integer is in fact a float, but don't
+                // print any trailing zeros.
+                s->Printf(".");
+              }
             }
 
             if (field < wosize_to_print - 1)
