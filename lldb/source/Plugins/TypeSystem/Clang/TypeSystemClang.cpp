@@ -3991,14 +3991,19 @@ TypeSystemClang::GetTypeInfo(lldb::opaque_compiler_type_t type,
     return 0;
 
   case clang::Type::LValueReference:
-  case clang::Type::RValueReference:
+  case clang::Type::RValueReference: {
     if (pointee_or_element_clang_type)
       pointee_or_element_clang_type->SetCompilerType(
           weak_from_this(),
           llvm::cast<clang::ReferenceType>(qual_type.getTypePtr())
               ->getPointeeType()
               .getAsOpaquePtr());
-    return eTypeHasChildren | eTypeIsReference | eTypeHasValue;
+    bool is_ocaml = true;
+    if (is_ocaml)
+      return eTypeHasValue;
+    else
+      return eTypeHasChildren | eTypeIsReference | eTypeHasValue;
+  } break;
 
   case clang::Type::MemberPointer:
     return eTypeIsPointer | eTypeIsMember | eTypeHasValue;
