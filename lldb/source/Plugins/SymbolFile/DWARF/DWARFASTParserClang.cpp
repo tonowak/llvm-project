@@ -3044,7 +3044,7 @@ void DWARFASTParserClang::ParseVariantPart(
         }
       }
       // For now, we don't support default variants, which don't have the DW_AT_discr_value.
-      if (uval64 == UINT64_MAX);
+      if (uval64 == UINT64_MAX)
         LLDB_LOG(log, "Failed to find a discriminant member in a variant.");
 
       // Adding each DW_TAG_member directly under the struct.
