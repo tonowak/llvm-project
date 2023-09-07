@@ -9073,6 +9073,15 @@ static bool DumpEnumValue(const clang::QualType &qual_type, Stream *s,
   return true;
 }
 
+#define ASSERT_USE_FALLBACK_PRINTING(boolean, data, byte_offset) \
+  if (!(boolean)) { \
+      LLDB_LOG(GetLog(LLDBLog::Target), "Failure in DumpTypeValue(): " #boolean); \
+      DumpDataExtractor(data, s, byte_offset, eFormatOCamlValue, 8, 1, \
+                               UINT32_MAX, LLDB_INVALID_ADDRESS, 0, 0, \
+                               exe_scope); \
+      return true; \
+  }
+
 bool TypeSystemClang::DumpTypeValue(
     lldb::opaque_compiler_type_t type, Stream *s, lldb::Format format,
     const lldb_private::DataExtractor &data, lldb::offset_t byte_offset,
@@ -9100,13 +9109,13 @@ bool TypeSystemClang::DumpTypeValue(
       ExecutionContext exe_ctx;
       exe_scope->CalculateExecutionContext(exe_ctx);
       Process *process = exe_ctx.GetProcessPtr();
-      assert(process);
+      ASSERT_USE_FALLBACK_PRINTING(process != nullptr, data, byte_offset);
 
       lldb::addr_t header_addr = data.getDataOriginalSource() - 8;
       Status error;
       uint64_t header =
         process->ReadUnsignedIntegerFromMemory(header_addr, 8, 0, error);
-      assert(!error.Fail());
+      ASSERT_USE_FALLBACK_PRINTING(!error.Fail(), data, byte_offset);
 
       uint64_t num_elements = header >> 10;
       uint64_t tag = header & 0xff;
@@ -9124,7 +9133,7 @@ bool TypeSystemClang::DumpTypeValue(
       bytes_read =
           process->ReadMemory(block_addr,
           &buffer.front(), buffer.size(), error);
-      assert(bytes_read == buffer.size() && !error.Fail());
+      ASSERT_USE_FALLBACK_PRINTING(bytes_read == buffer.size() && !error.Fail(), data, byte_offset);
       DataExtractor element_data_extractor(&buffer.front(), buffer.size(),
           data.GetByteOrder(), data.GetAddressByteSize());
 
@@ -9175,22 +9184,22 @@ bool TypeSystemClang::DumpTypeValue(
     } break;
 
     case clang::Type::Record: {
-      assert(GetCompleteType(type));
+      ASSERT_USE_FALLBACK_PRINTING(GetCompleteType(type) == true, data, byte_offset)
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(qual_type.getTypePtr());
-      assert(record_type);
+      ASSERT_USE_FALLBACK_PRINTING(record_type != nullptr, data, byte_offset);
       const clang::RecordDecl *record_decl = record_type->getDecl();
-      assert(record_decl);
+      ASSERT_USE_FALLBACK_PRINTING(record_decl != nullptr, data, byte_offset);
       const clang::CXXRecordDecl *cxx_record_decl =
           llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
-      assert(cxx_record_decl);
+      ASSERT_USE_FALLBACK_PRINTING(cxx_record_decl != nullptr, data, byte_offset);
 
       bool is_artificial = !cxx_record_decl->isImplicit();
 
       ExecutionContext exe_ctx;
       exe_scope->CalculateExecutionContext(exe_ctx);
       Process *process = exe_ctx.GetProcessPtr();
-      assert(process);
+      ASSERT_USE_FALLBACK_PRINTING(process != nullptr, data, byte_offset);
 
       std::vector<uint8_t> buffer;
 
@@ -9202,13 +9211,13 @@ bool TypeSystemClang::DumpTypeValue(
         std::pair<clang::FieldDecl*, uint32_t> discr_field = {nullptr, 0};
         for (clang::FieldDecl *field_decl : cxx_record_decl->fields()) {
           if (!field_decl->hasVariantDiscrValue()) {
-            assert(!discr_field.first);
+            ASSERT_USE_FALLBACK_PRINTING(discr_field.first == nullptr, data, byte_offset);
             discr_field.first = field_decl;
             break;
           }
           ++discr_field.second;
         }
-        assert(discr_field.first);
+        ASSERT_USE_FALLBACK_PRINTING(discr_field.first != nullptr, data, byte_offset);
 
         auto get_bit_size = [&](clang::FieldDecl *field, uint32_t field_idx) {
           clang::QualType field_type = field->getType();
@@ -9252,7 +9261,8 @@ bool TypeSystemClang::DumpTypeValue(
             bytes_read =
                 process->ReadMemory(field_addr,
                 &buffer.front(), buffer.size(), error);
-            assert(bytes_read == buffer.size() && !error.Fail());
+            ASSERT_USE_FALLBACK_PRINTING(bytes_read == buffer.size() && !error.Fail(),
+                data, byte_offset + field_bit_offset / 8);
             field_data_extractor = DataExtractor(&buffer.front(), buffer.size(),
                 data.GetByteOrder(), data.GetAddressByteSize());
             data_offset = 0;
@@ -9263,6 +9273,7 @@ bool TypeSystemClang::DumpTypeValue(
           field_clang_type.DumpTypeValue(s, field_clang_type.GetFormat(), field_data_extractor, data_offset,
               field_byte_size, field_bit_size, field_bit_offset,
               exe_scope);
+          return true;
         };
         if (!is_artificial) {
           // We're assuming that the discriminant is an enum, so we're printing it.
@@ -9281,7 +9292,7 @@ bool TypeSystemClang::DumpTypeValue(
             ++cnt_found_children;
           }
         }
-        assert(cnt_found_children > 0);
+        ASSERT_USE_FALLBACK_PRINTING(cnt_found_children > 0, data, byte_offset);
 
         // Printing all the fields with the given discriminant (there can be multiple).
         if (is_tuple)
@@ -9331,7 +9342,7 @@ bool TypeSystemClang::DumpTypeValue(
           }
           else {
             std::optional<uint64_t> size = field_clang_type.GetByteSize(exe_scope);
-            assert(size && *size < UINT32_MAX);
+            ASSERT_USE_FALLBACK_PRINTING(size && *size < UINT32_MAX, data, byte_offset);
             field_bit_size = 8 * (unsigned int) *size;
           }
           unsigned int field_byte_size = (field_bit_size + 8 - 1) / 8;
@@ -9352,12 +9363,13 @@ bool TypeSystemClang::DumpTypeValue(
     } break;
 
     case clang::Type::LValueReference: {
-      uint64_t value = data.GetU64(&byte_offset);
-      assert(exe_scope);
+      lldb::offset_t byte_offset_copy = byte_offset;
+      uint64_t value = data.GetU64(&byte_offset_copy);
+      ASSERT_USE_FALLBACK_PRINTING(exe_scope != nullptr, data, byte_offset);
       ExecutionContext exe_ctx;
       exe_scope->CalculateExecutionContext(exe_ctx);
       Process *process = exe_ctx.GetProcessPtr();
-      assert(process);
+      ASSERT_USE_FALLBACK_PRINTING(process != nullptr, data, byte_offset);
       clang::QualType underlying_type_qual = qual_type.getTypePtr()->getPointeeType();
       CompilerType underlying_type_compiler = GetType(underlying_type_qual);
 
@@ -9374,19 +9386,20 @@ bool TypeSystemClang::DumpTypeValue(
           0, 8, 64, 0, exe_scope);
         return true;
       }
-      assert(record_qual.getTypePtr()->getTypeClass() == clang::Type::Record);
+      ASSERT_USE_FALLBACK_PRINTING(record_qual.getTypePtr()->getTypeClass() == clang::Type::Record,
+          data, byte_offset);
       const clang::RecordType *record_type =
           llvm::cast<clang::RecordType>(record_qual.getTypePtr());
-      assert(record_type);
+      ASSERT_USE_FALLBACK_PRINTING(record_type != nullptr, data, byte_offset);
       const clang::RecordDecl *record_decl = record_type->getDecl();
-      assert(record_decl);
+      ASSERT_USE_FALLBACK_PRINTING(record_decl != nullptr, data, byte_offset);
       const clang::CXXRecordDecl *cxx_record_decl =
           llvm::dyn_cast<clang::CXXRecordDecl>(record_decl);
-      assert(cxx_record_decl);
+      ASSERT_USE_FALLBACK_PRINTING(cxx_record_decl != nullptr, data, byte_offset);
       value += cxx_record_decl->getOffsetRecordFromPointer();
 
       std::optional<uint64_t> size = underlying_type_compiler.GetByteSize(exe_scope);
-      assert(size);
+      ASSERT_USE_FALLBACK_PRINTING(size.has_value(), data, byte_offset);
 
       std::vector<uint8_t> buffer;
       buffer.resize(*size);
@@ -9395,7 +9408,8 @@ bool TypeSystemClang::DumpTypeValue(
       bytes_read =
           process->ReadMemory(value,
           &buffer.front(), buffer.size(), error);
-      assert(bytes_read == buffer.size() && !error.Fail());
+      ASSERT_USE_FALLBACK_PRINTING(bytes_read == buffer.size() && !error.Fail(),
+          data, byte_offset);
 
       DataExtractor under_pointer(&buffer.front(), *size,
           process->GetByteOrder(), 8);
