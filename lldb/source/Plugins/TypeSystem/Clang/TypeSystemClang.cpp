@@ -9127,10 +9127,14 @@ bool TypeSystemClang::DumpTypeValue(
 
       // With the float optimization enabled the DWARF isn't always
       // accurate, so we need to watch out for Double_array_tag.
-      if (tag == 254)
-        return DumpDataExtractor(data, s, byte_offset, eFormatOCamlValue, 8, 1,
+      if (tag == 254) {
+        uint64_t value = data.getDataOriginalSource();
+        DataExtractor data_extractor((const void*) &value, 8, data.GetByteOrder(), data.GetAddressByteSize());
+        return DumpDataExtractor(data_extractor, s, 0, eFormatOCamlValue, 8, 1,
                                 UINT32_MAX, LLDB_INVALID_ADDRESS, 0, 0,
                                 exe_scope);
+      }
+
 
       buffer.resize(num_elements * 8);
       size_t bytes_read;
