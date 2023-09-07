@@ -259,12 +259,14 @@ void ValueObjectPrinter::PrintDecl() {
         }
       }
       if (is_ocaml) {
-        std::string to_erase("(&) ");
-        for (auto iter = type_name_str.find(to_erase); iter != std::string::npos;
-             iter = type_name_str.find(to_erase)) {
-          type_name_str.erase(iter, to_erase.size());
+        for (std::string to_erase : {"(&) ", " &"}) {
+          for (auto iter = type_name_str.find(to_erase); iter != std::string::npos;
+              iter = type_name_str.find(to_erase)) {
+            type_name_str.erase(iter, to_erase.size());
+          }
         }
       }
+      typeName << type_name_str.c_str();
     }
   }
 
@@ -302,6 +304,7 @@ void ValueObjectPrinter::PrintDecl() {
       m_stream->PutCString(dest_stream.GetString());
     }
   }
+
 
   // if the helper failed, or there is none, do a default thing
   if (!decl_printed) {
