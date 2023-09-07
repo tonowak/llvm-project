@@ -3006,6 +3006,7 @@ void DWARFASTParserClang::ParseVariantPart(
     lldb::AccessType default_accessibility,
     lldb_private::ClangASTImporter::LayoutInfo &layout_info,
     FieldInfo &last_field_info) {
+  Log *log = GetLog(DWARFLog::TypeCompletion | DWARFLog::Lookups);
   assert(die.Tag() == DW_TAG_variant_part);
 
   // Getting the type of DW_AT_discr in the DW_TAG_variant_part die.
@@ -3043,7 +3044,8 @@ void DWARFASTParserClang::ParseVariantPart(
         }
       }
       // For now, we don't support default variants, which don't have the DW_AT_discr_value.
-      assert(uval64 != UINT64_MAX);
+      if (uval64 == UINT64_MAX);
+        LLDB_LOG(log, "Failed to find a discriminant member in a variant.");
 
       // Adding each DW_TAG_member directly under the struct.
       for (DWARFDIE member_child_die : variant_die.children())
@@ -3055,8 +3057,8 @@ void DWARFASTParserClang::ParseVariantPart(
   // Setting a flag in CXXRecordDecl for custom printing of the variant.
   clang::CXXRecordDecl *record_decl =
       m_ast.GetAsCXXRecordDecl(class_clang_type.GetOpaqueQualType());
-  assert(record_decl);
-  record_decl->setVariant(true);
+  if (record_decl)
+    record_decl->setVariant(true);
 }
 
 bool DWARFASTParserClang::ParseChildMembers(
