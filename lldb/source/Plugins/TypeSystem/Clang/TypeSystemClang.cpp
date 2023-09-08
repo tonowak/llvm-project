@@ -9210,7 +9210,8 @@ bool DumpTypeVariant(const clang::QualType &qual_type, Stream *s,
     s->PutCString(cnt_found_children > 1 ? ")" : "");
   else
     s->PutCString(" }");
-  s->PutChar(')');
+  if (!is_artificial)
+    s->PutChar(')');
   return true;
 }
 
